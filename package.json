@@ -1,0 +1,41 @@
+{
+  "name": "talks",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev": "pnpm run picker dev --open",
+    "build": "rimraf dist && pnpm run picker build",
+    "build:all": "rimraf dist && pnpm -r run build",
+    "export": "pnpm run picker export",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "picker": "esno scripts/picker.ts"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^5.2.1",
+    "@iconify/json": "^2.2.373",
+    "@slidev/cli": "^52.1.0",
+    "@slidev/client": "^52.1.0",
+    "@slidev/theme-default": "^0.25.0",
+    "@types/node": "^20.19.11",
+    "@types/prompts": "^2.4.9",
+    "@types/seedrandom": "^3.0.8",
+    "eslint": "^9.33.0",
+    "eslint-plugin-format": "^1.0.1",
+    "esno": "^4.8.0",
+    "execa": "^9.6.0",
+    "markdown-it-magic-link": "^0.1.4",
+    "playwright-chromium": "^1.54.2",
+    "pnpm": "^10.14.0",
+    "prettier-plugin-slidev": "^1.0.5",
+    "prompts": "^2.4.2",
+    "rimraf": "^6.0.1",
+    "seedrandom": "^3.0.5",
+    "taze": "^19.1.0",
+    "typescript": "^5.9.2",
+    "unocss": "^66.4.2",
+    "vue-router": "^4.5.1",
+    "vue-tsc": "^3.0.5"
+  }
+}
