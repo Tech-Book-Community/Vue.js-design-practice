@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   icons:
+    '@iconify-json/carbon':
+      specifier: ^1.2.8
+      version: 1.2.13
     '@iconify-json/devicon':
       specifier: ^1.2.23
       version: 1.2.43
@@ -104,8 +107,11 @@ importers:
 
   2025-09-04/src: {}
 
-  2025-11-13/src:
+  2025-11-13-diff-algorithms/src:
     devDependencies:
+      '@iconify-json/carbon':
+        specifier: catalog:icons
+        version: 1.2.13
       '@iconify-json/devicon':
         specifier: catalog:icons
         version: 1.2.43
