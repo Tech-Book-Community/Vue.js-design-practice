@@ -206,80 +206,231 @@ const obj = new Proxy(data, {
 ```
 
 ---
-## 三種模式的定位
 
-<div class="grid grid-cols-1 gap-4 mt-3">
+## 4.3 設計一個完善的響應系統
 
-<div class="bg-gray-800/30 p-2 rounded">
-<h3 class="text-sm font-bold mb-0">原生 JavaScript</h3>
-<p class="text-gray-300 text-xs mb-0">直接 DOM API 操作（createElement/append 等）</p>
-<p class="text-xs text-gray-400">心智負擔最高、維護性最低，但性能上限最高</p>
-</div>
+- 不過細細觀看上一段程式碼，會發現 ```讀取動作 get ，effect 從哪裡來```
+- 我們需要設置一個全局的 ```activeEffect```，紀錄當前執行的 ```effect```
+- 當我們從```桶子(bucket)```取出effect執行時，依序替換```activeEffect```
 
-<div class="bg-gray-800/30 p-2 rounded">
-<h3 class="text-sm font-bold mb-0">innerHTML</h3>
-<p class="text-gray-300 text-xs mb-0">渲染 HTML 字串，更新時傾向銷毀重建</p>
-<p class="text-xs text-gray-400">心智負擔較低、維護性中等，性能與模板大小高度相關</p>
-</div>
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
 
-<div class="bg-gray-800/30 p-2 rounded">
-<h3 class="text-sm font-bold mb-0">虛擬 DOM</h3>
-<p class="text-gray-300 text-xs mb-0">先建立 JS 物件（VNode）+ Diff，僅做必要 DOM 更新</p>
-<p class="text-xs text-gray-400">心智負擔中等、維護性中高，性能依變更規模而變</p>
-</div>
+```js
+const data = { price: 1000, quantity: 5 };
+const bucket: Set<Function> = new Set();
 
-</div>
+// 設定一個全局的當前的執行的activeEffect
+let activeEffect
 
----
+const obj = new Proxy(data, {
+  // 攔截讀取 get
+  get(target: any, key: string, receiver) {
+    // 副作用收集
+    bucket.add(activeEffect);
+    // 返回要get的属性值
+    return Reflect.get(target,key,receiver)
+  },
+  set(target: any, key: string, newVal) {
+    target[key] = newVal
+    bucket.forEach(fn=>fn()) // 這裡是取出effect一一執行
+  }
+```
 
-## 創建 vs 更新
+```js
+function effect(fn) {
+  activeEffect = fn
+  fn()
+}
 
-- 創建：VDOM 與 innerHTML 差距不大
-- 更新：VDOM 優勢在「找差異並最小化更新」
-- 目標：在不犧牲可維護性的前提下把性能差距壓到最小
-
----
-
-## 執行時與編譯時：三種模式
-
-- 純執行時（Runtime-only）：直接以資料結構驅動渲染與更新；靈活、可動態，但運行時計算較多
-- 執行時 + 編譯時（Vue 3）：保留靈活性，並在編譯期做靜態提升、PatchFlags、Block Tree 等優化
-- 純編譯時（Compile-only）：將模板編譯成命令式代碼，運行時最小；對動態能力與邊界條件需取捨
-
----
-
-## layout: center
-
-# 第二章：框架設計的核心要素
-
----
-
-## 框架的核心
-
-- DX
-
-- Bundle Size
-
-- Tree Shaking
-
-- 構建產物
-
-- TS 型別支持
-
----
-
-## 錯誤訊息
-
-<div h="80%" grid="~ place-items-center">
-  <img src="/vue-warn.png">
+```
 </div>
 
 ---
 
-## 格式化輸出
+## 4.1~4.3 Recap 響應式系統基礎總結
 
-<div h="80%" grid="~ place-items-center">
-  <img src="/chrome.png">
+- 響應式系統基礎建立在 ```get(讀取) --> bucket.add(註冊)-->set(賦值)-->取出副作用(effect)-->觸發更新(trigger)```
+- 有```讀取(getter)```才會註冊副作用，這也是為什麼```watch```設計成getter
+- 兩個資料建立副作用關係，依賴於 set 修改邏輯中， ```effect```是否有讀取其他變數
+
+只有讀取才會建立依賴。
+
+只有修改才會觸發依賴。
+
+如果 effect 只會「修改」而不「讀取」，那它根本不會進入 bucket，也就不會被響應系統追蹤。
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+watch(
+  () => state.a,
+  (newVal) => {
+    state.b = newVal + 1
+  }
+)
+```
+
+```js
+watch(
+  () => state.a,
+  () => {
+    state.b = state.a + 1
+  }
+)
+```
+</div>
+
+---
+
+### 響應式流程 trigger-track 圖解
+
+![](/trigger-track.png)
+
+---
+
+## 4.3 響應式系統資料樹狀圖建立
+
+- 目前我們的副作用(effect)紀錄管理，bucket 僅能對```一個物件其中單一屬性```紀錄並取出執行
+- 需要針對不同 ```物件(target)```、```屬性(key)```和```副作用(effect)```，利用key-value資料結構管理
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+
+const data = {
+  price: 1000,
+  quantity: 1
+}
+
+let total = 0
+
+// 副作用
+const effect = ()=> {
+  total = price * quantity
+}
+
+// 如果price 和 quantity 這兩筆資料有各自的獨立effect?
+const effectPrice = ()=>{
+  console.log('品項價格',data.price)
+}
+
+const effectQuantity = ()=> {
+  console.log('數量',data.quantity)
+}
+
+```
+```js
+const bucket: Set<Function> = new Set();
+
+// 設定一個全局的當前的執行的activeEffect
+let activeEffect
+
+const obj = new Proxy(data, {
+  // 攔截讀取 get
+  get(target: any, key: string, receiver) {
+    // 副作用收集
+    bucket.add(activeEffect);
+    // 返回要get的属性值
+    return Reflect.get(target,key,receiver)
+  },
+  set(target: any, key: string, newVal) {
+    target[key] = newVal
+    bucket.forEach(fn=>fn()) // 這裡是取出effect一一執行
+  }
+
+```
+</div>
+
+
+---
+
+## 4.3 WeakMap - Map - Set 響應式副作用資料表結構
+參考: https://ithelp.ithome.com.tw/articles/10264271?sc=rss.iron
+<div style="max-width:560px; margin: 0 auto;">
+  <img src="/weakmap-map.jpg" alt="WeakMap vs Map" style="width:100%; height:auto;">
+</div>
+
+---
+
+## 4.3 Proxy攔截器中將副作用註冊和取出
+
+- 可以設計```註冊(track)```和```觸發(trigger)```，作為響應資料間依賴關係的```訂閱(subscribe)```和```通知(notify)```
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+// 定义 track 方法收集副作用函数
+const track = (target: any, key: string) => {
+  // 当前没有正在执行的副作用函数，直接返回
+  if (!activeEffect) return;
+  // 取出目标对象指向的 Map
+  let depsMap = bucket.get(target);
+  if (!depsMap) {
+    // 如果不存在，就创建一个新的 Map
+    depsMap = new Map()
+    // 将新的 Map 添加到 「桶」中
+    bucket.set(target, depsMap);
+  }
+  // 根据当前 key 取出 副作用函数的集合，她是一个 Set
+  let deps = depsMap.get(key);
+  if (!deps) {
+    // 如果不存在就创建一个新的 Set
+    deps = new Set();
+    // 将新的 Set 添加到 Map 中去
+    depsMap.set(key, deps);
+  }
+  // 收集副作用函数
+  deps.add(activeEffect);
+}
+```
+```js
+// 定义trigger方法用来触发副作用函数的执行
+const trigger = (target: any, key: string) => {
+  // 从「桶」中取出当前对象绑定的 Map
+  const depsMap = bucket.get(target);
+  if (depsMap) {
+    // 根据 key 取出与之绑定的副作用函数集合
+    const effects = depsMap.get(key);
+    // 遍历并执行这些副作用函数
+    effects && effects.forEach(fn => fn());
+  }
+}
+```
+</div>
+---
+
+## 4.3 重構完 track/trigger
+https://vuejs.org/guide/extras/reactivity-in-depth.html#how-reactivity-works-in-vue
+
+- 記得 Vue 整個應用上還管理著 ```bucket(副作用桶子)```和```activeEffect(目前執行的effect)```
+- 每一個響應式資料實體(ref/reactive)，透過 ```track```和```trigger``` 和副作用紀錄進行連結
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+function reactive(obj) {
+  return new Proxy(obj, {
+    get(target, key) {
+      track(target, key)
+      return target[key]
+    },
+    set(target, key, value) {
+      target[key] = value
+      trigger(target, key)
+    }
+  })
+}
+```
+```js
+function ref(value) {
+  const refObject = {
+    get value() {
+      track(refObject, 'value')
+      return value
+    },
+    set value(newValue) {
+      value = newValue
+      trigger(refObject, 'value')
+    }
+  }
+  return refObject
+}
+```
 </div>
 
 ---
