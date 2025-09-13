@@ -9,18 +9,19 @@ glowSeed: 4
 fonts:
   provider: none
 ---
-# 第四章：響應式系統的作用和實作
 
+# 第四章：響應式系統的作用和實作
 
 ---
 
-## 響應式資料的基礎-認識副作用(effect)
+## 4.1 響應式資料的基礎-認識副作用(effect)
 
 副作用 VS 純函式
 
 純函式(pure function)的意義:
+
 - 相同輸入而有穩定的相同輸出
-- 引用的透明性(沒有外干擾外部變數作用)
+- 引用的透明性(沒有干擾或設定外部變數作用)
 
 ```js
 const add(x: number, y: number) => x + y;
@@ -29,7 +30,9 @@ console.log(add(1, 2)) // 3
 console.log(add(1, 2)) // 3
 
 ```
+
 副作用(side effect): 引用的不透明性+不穩定輸出
+
 ```js
 let a = 1;
 
@@ -43,7 +46,8 @@ console.log(foo(1)) // 4
 
 ---
 
-## 響應式系統的雛型
+## 4.1 響應式系統的雛型
+
 <div h="80%" flex="~ col gap-y-8">
 
 <div>
@@ -51,55 +55,157 @@ console.log(foo(1)) // 4
 我們希望更改價格或數量時，total 價格可以響應地自動正確變化
 
 ```js
-let price = 1000
-let quantity = 2
-let total = price * quantity
+let price = 1000;
+let quantity = 2;
+let total = price * quantity;
 
 const effect = () => {
-  total = price * quantity 
+  total = price * quantity;
+};
+```
+
+目前需要在資料變化時手動執行effect
+
+```js
+price = 1500;
+effect();
+console.log(total); //3000
+```
+
+</div>
+</div>
+
+---
+
+## 4.2 響應式資料實作
+
+- 執行副作用 (effect) 時，知道有那些依賴資料需些讀取 (get)
+- 修改(set) 依賴資料時，同時又要通知相關的副作用重新執行 (trigger)
+
+我們需要對物件屬性 `自動攔截` 上述這些操作，讓響應式這個行為能夠自然地執行
+
+```mermaid
+flowchart LR
+    A["effect()<br/>total = price * quantity"] -->|get| B["price<br/>quantity"]
+    B -->|set| C["price = 1500<br/>quantity = 3"]
+    C -->|trigger| A
+
+    style A fill:black,stroke:#1976d2,stroke-width:2px
+    style B fill:#black,stroke:#f57c00,stroke-width:2px
+    style C fill:#black,stroke:#388e3c,stroke-width:2px
+```
+
+
+---
+
+## 4.2 響應式桶子(bucket)
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start;">
+
+  <div>
+    <ul style="margin:0; padding-left:1.2em; text-align:start">
+      <li>為了收集紀錄這些副作用 (effect)，我們需要一個桶子 (bucket) 來做儲存</li>
+      <li>Vue 3 利用了 
+        <spans style="color:orange">JS ES6 Proxy</spans> 
+      特性來達成對於資料讀取和變動的自動攔截</li>
+    </ul>
+  </div>
+
+  <div style="text-align:center;">
+    <img src="/bucket.jpg" alt="bucket" style="max-width:100%; height:400px; width:350px;">
+  </div>
+</div>
+
+---
+
+## 4.2 Vue 2 ES5 defineProperty
+
+- 如果一個物件有新的屬性，會需要遍例查察找
+- 陣列的新增修改也比較麻煩，需要特殊處理 ```Vue.set()```
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+
+```js
+class SimpleReactive {
+  constructor(data) {
+    this.data = {};
+    this.effects = new Set();
+    this.currentEffect = null;
+    
+    // 使用 Object.defineProperty 為每個屬性創建響應式
+    this.makeReactive(data);
+  }
+  makeReactive(obj) {
+    Object.keys(obj).forEach(key => {
+      let value = obj[key];
+      
+      Object.defineProperty(this.data, key, {
+        get: () => {
+          // getter: 收集依賴
+          if (this.currentEffect) {
+            this.effects.add(this.currentEffect);
+            console.log(`📖 get ${key}: ${value} (收集依賴)`);
+          }
+          return value;
+        },
+        
+      });
+    });
+  }
+  
 }
 ```
-
+```js
+   set: (newValue) => {
+          // setter: 觸發更新
+          if (value !== newValue) {
+            console.log(`✏️ set ${key}: ${value} -> ${newValue}`);
+            value = newValue;
+            
+            // 觸發所有相關的 effects
+            this.effects.forEach(effect => {
+              console.log(`🚀 觸發 effect 重新執行`);
+              effect();
+            });
+          }
+        }
+```
 </div>
 
-<div>
+---
 
-## Vue
+## 4.2 Vue 3 ES6 Proxy 代理攔截
 
-```vue
-<!-- Vue -->
-<div id="app" @click="() => alert('ok')">{{ msg }}</div>
+- ```target``` 原始物件
+- ```Proxy(target,handler)```,我們可以利用第二個參數 handler 設定攔截邏輯
+- 這邊可以先注意 ```get```取得的值其實是```Reflect```返回 Proxy 物件，避免後續需要讀取操作時失去攔截作用
+
+```js
+// 原始數據
+const data = { price: 1000, quantity: 5 };
+const bucket: Set<Function> = new Set();
+const obj = new Proxy(data, {
+  // 攔截讀取 get
+  get(target: any, key: string, receiver) {
+    // 副作用收集
+    bucket.add(effect);
+    // 返回要get的属性值
+    return Reflect.get(target,key,receiver)
+  },
+  set(target: any, key: string, value: any) {
+    // 針對資料屬性賦值
+    target[key] = value;
+    // 觸發設置的副作用
+    bucket.forEach(fn => fn());
+    // 属性值設置成功後返回 true
+    return true;
+  }
+})
+
+
 ```
 
-</div>
-
-</div>
-
 ---
-
-## 性能與可維護性的權衡
-
-- 結論：聲明式代碼的性能不優於命令式代碼
-- 更新成本模型：
-
-$$
-\text{命令式更新消耗} = A
-$$
-
-$$
-\text{聲明式更新消耗} = B + A
-$$
-
----
-layout: fact
----
-
-## 為什麼 Vue 要選擇聲明式 ?
-
-讓使用者描述「結果」，框架負責「過程」，降低心智負擔
-
----
-
 ## 三種模式的定位
 
 <div class="grid grid-cols-1 gap-4 mt-3">
@@ -141,8 +247,8 @@ layout: fact
 - 純編譯時（Compile-only）：將模板編譯成命令式代碼，運行時最小；對動態能力與邊界條件需取捨
 
 ---
-layout: center
----
+
+## layout: center
 
 # 第二章：框架設計的核心要素
 
@@ -194,14 +300,14 @@ layout: center
 if (__DEV__) {
   warn(
     `Set operation on key "${String(key)}" failed: target is readonly.`,
-    target,
-  )
+    target
+  );
 }
 ```
 
-> Make sure to put dev-only code in __DEV__ branches so they are tree-shakable.
+> Make sure to put dev-only code in **DEV** branches so they are tree-shakable.
 >
-> 請務必將僅限開發的程式碼放在 __DEV__ 分支中，以便它們可樹狀結構可搖動。
+> 請務必將僅限開發的程式碼放在 **DEV** 分支中，以便它們可樹狀結構可搖動。
 
 </div>
 
@@ -216,9 +322,11 @@ if (__DEV__) {
 </div>
 
 ---
+
 layout: iframe
 url: https://rollupjs.org/repl/?version=4.45.1&shareable=JTdCJTIyZXhhbXBsZSUyMiUzQW51bGwlMkMlMjJtb2R1bGVzJTIyJTNBJTVCJTdCJTIyY29kZSUyMiUzQSUyMmltcG9ydCUyMCU3QiUyMGNyZWF0ZUElMkMlMjBjcmVhdGVCJTJDJTIwY3JlYXRlQyUyMCU3RCUyMGZyb20lMjAnLiUyRmxpYi5qcyclM0IlNUNuJTVDbmNvbnN0JTIwdW51c2VkQSUyMCUzRCUyMGNyZWF0ZUEoKSU1Q25jb25zdCUyMHVudXNlZEIlMjAlM0QlMjAlMkYqJTQwX19QVVJFX18qJTJGJTIwY3JlYXRlQigpJTVDbmNvbnN0JTIwdW51c2VkQyUyMCUzRCUyMGNyZWF0ZUMoKSUyMiUyQyUyMmlzRW50cnklMjIlM0F0cnVlJTJDJTIybmFtZSUyMiUzQSUyMm1haW4uanMlMjIlN0QlMkMlN0IlMjJjb2RlJTIyJTNBJTIyZXhwb3J0JTIwZnVuY3Rpb24lMjBjcmVhdGVBKCklMjAlN0IlNUNuJTIwJTIwY29uc29sZS5sb2coJ3NpZGUlMjBlZmZlY3QnKSU1Q24lMjAlMjByZXR1cm4lMjAlN0IlN0QlNUNuJTdEJTVDbiU1Q25leHBvcnQlMjBmdW5jdGlvbiUyMGNyZWF0ZUIoKSUyMCU3QiU1Q24lMjAlMjBjb25zb2xlLmxvZygnc2lkZSUyMGVmZmVjdCcpJTVDbiUyMCUyMHJldHVybiUyMCU3QiU3RCU1Q24lN0QlNUNuJTVDbiUyRiolMjAlMjNfX05PX1NJREVfRUZGRUNUU19fJTIwKiUyRiU1Q25leHBvcnQlMjBmdW5jdGlvbiUyMGNyZWF0ZUMoKSUyMCU3QiU1Q24lMjAlMjBjb25zb2xlLmxvZygnc2lkZSUyMGVmZmVjdCcpJTVDbiUyMCUyMHJldHVybiUyMCU3QiU3RCU1Q24lN0QlMjIlMkMlMjJpc0VudHJ5JTIyJTNBZmFsc2UlMkMlMjJuYW1lJTIyJTNBJTIybGliLmpzJTIyJTdEJTVEJTJDJTIyb3B0aW9ucyUyMiUzQSU3QiUyMm91dHB1dCUyMiUzQSU3QiUyMmZvcm1hdCUyMiUzQSUyMmVzJTIyJTdEJTJDJTIydHJlZXNoYWtlJTIyJTNBdHJ1ZSU3RCU3RA==
 scale: 0.6
+
 ---
 
 ---
@@ -229,23 +337,22 @@ scale: 0.6
 - ESM (捆綁器)
 - CJS (Node SSR)
 
-
 ---
 
 # TS 型別支持
 
 ```ts {monaco} {height: '150px'}
-import { ref } from 'vue'
+import { ref } from "vue";
 
 // 自動判斷為 number
-const a = ref(1)
+const a = ref(1);
 
-a.value = '1' // error
+a.value = "1"; // error
 ```
 
 ---
-layout: center
----
+
+## layout: center
 
 # 第三章：Vue.js 3 的設計思路
 
@@ -261,14 +368,12 @@ layout: center
 
 ```ts
 const title = {
-  tag: 'h1',
+  tag: "h1",
   props: {
-    onClick: handler
+    onClick: handler,
   },
-  children: [
-    { tag: 'span' }
-  ]
-}
+  children: [{ tag: "span" }],
+};
 ```
 
 </div>
@@ -277,20 +382,19 @@ const title = {
 
 Vue.js 模板 (hyperscript)
 
-
 ````md magic-move {at:3}
 ```vue
 <h1 @click="handler"><span></span></h1>
 ```
 
 ```ts
-import { h } from 'vue'
+import { h } from "vue";
 
 export default {
   render() {
-    return h('h1', { onClick: handler }, [h('span')])
-  }
-}
+    return h("h1", { onClick: handler }, [h("span")]);
+  },
+};
 ```
 ````
 
@@ -299,8 +403,8 @@ export default {
 </v-clicks>
 
 ---
-layout: fact
----
+
+## layout: fact
 
 ## JavaScript 物件來描述 UI = 虛擬 DOM
 
@@ -325,7 +429,7 @@ graph LR
 ```ts
 function renderer(vnode, container) {
   // 使用 vnode.tag 作為標籤名稱創建 DOM 元素
-  const el = document.createElement(vnode.tag)
+  const el = document.createElement(vnode.tag);
   // 遍歷 vnode.props，將屬性、事件添加到 DOM 元素
   for (const key in vnode.props) {
     if (/^on/.test(key)) {
@@ -333,21 +437,21 @@ function renderer(vnode, container) {
       el.addEventListener(
         key.substr(2).toLowerCase(), // 事件名稱 onClick ---> click
         vnode.props[key] // 事件處理函數
-      )
+      );
     }
   }
 
   // 處理 children
-  if (typeof vnode.children === 'string') {
+  if (typeof vnode.children === "string") {
     // 如果 children 是字串，說明它是元素的文本子節點
-    el.appendChild(document.createTextNode(vnode.children))
+    el.appendChild(document.createTextNode(vnode.children));
   } else if (Array.isArray(vnode.children)) {
     // 遞歸地調用 renderer 函數渲染子節點，使用當前元素 el 作為掛載點
-    vnode.children.forEach(child => renderer(child, el))
+    vnode.children.forEach((child) => renderer(child, el));
   }
 
   // 將元素添加到掛載點下
-  container.appendChild(el)
+  container.appendChild(el);
 }
 ```
 
@@ -363,14 +467,14 @@ function renderer(vnode, container) {
 const MyComponent = {
   render() {
     return {
-      tag: 'div',
+      tag: "div",
       props: {
-        onClick: () => alert('hello')
+        onClick: () => alert("hello"),
       },
-      children: 'click me'
-    }
-  }
-}
+      children: "click me",
+    };
+  },
+};
 ```
 
 ---
@@ -380,7 +484,7 @@ const MyComponent = {
 ```ts
 function mountElement(vnode, container) {
   // 使用 vnode.tag 作為標籤名稱創建 DOM 元素
-  const el = document.createElement(vnode.tag)
+  const el = document.createElement(vnode.tag);
   // 遍歷 vnode.props，將屬性、事件添加到 DOM 元素
   for (const key in vnode.props) {
     if (/^on/.test(key)) {
@@ -388,19 +492,19 @@ function mountElement(vnode, container) {
       el.addEventListener(
         key.substr(2).toLowerCase(), // 事件名稱 onClick ---> click
         vnode.props[key] // 事件處理函數
-      )
+      );
     }
   }
   // 處理 children
-  if (typeof vnode.children === 'string') {
+  if (typeof vnode.children === "string") {
     // 如果 children 是字串，說明它是元素的文本子節點
-    el.appendChild(document.createTextNode(vnode.children))
+    el.appendChild(document.createTextNode(vnode.children));
   } else if (Array.isArray(vnode.children)) {
     // 遞迴地調用 renderer 函數渲染子節點，使用當前元素 el 作為掛載點
-    vnode.children.forEach(child => renderer(child, el))
+    vnode.children.forEach((child) => renderer(child, el));
   }
   // 將元素添加到掛載點下
-  container.appendChild(el)
+  container.appendChild(el);
 }
 ```
 
@@ -409,16 +513,16 @@ function mountElement(vnode, container) {
 ## 模板的工作原理
 
 ````md magic-move {at:2}
-```vue 
+```vue
 <template>
   <div @click="handler">click me</div>
 </template>
 ```
 
 ```js
-import { h } from 'vue'
+import { h } from "vue";
 export function render() {
-  return h('div', { onClick: handler }, 'click me')
+  return h("div", { onClick: handler }, "click me");
 }
 ```
 ````
@@ -443,7 +547,7 @@ export function render() {
 
 </div>
 
---- 
+---
 
 # 參考資料
 
