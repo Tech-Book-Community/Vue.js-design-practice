@@ -435,58 +435,113 @@ function ref(value) {
 
 ---
 
-## Chrome 工具列
+## 4.4 分支管理和clean up
 
-<div h="80%" grid="~ place-items-center">
-  <img h-100 src="/console.png">
-</div>
+- 這章主要是闡述，在 ```副作用effect``` 執行中因為透過 ```讀取``` 去紀錄資料屬性和相關副作用關係
+- 這段副作用關係間紀錄會```一成不變```，還是有```動態改變```可能性? 
+
+
+```js
+const data = {
+  ok: true,
+  text: 'hello'
+}
+const obj = new Proxy(data,{/** */})
+// effect
+effect( function effectFn() {
+   document.body.innerText = obj.ok? obj.text : 'not'
+})
+// 有兩種effect 可能性
+// 根據 obj.ok 結果 effect 紀錄表要有所變化
+effect( function effectFnA() {
+   document.body.innerText = 'not'
+})
+
+effect( function effectFnB() {
+   document.body.innerText = obj.text 
+})
+
+```
+
 
 ---
 
-# isDev
+## 4.4 透過建立effect dep 依賴屬性key的關係 (重要)
+- 每個物件屬性 dep(Set)，裡面除了紀錄 ```effect```，也為```effect```增加```dep```
+- ```effect.dep```記錄著當下註冊的所有```dep set```的實體鍵結關係
+- 先做清除動作(clean up)， 再讓```effect dep```去刪除會不必要的 ```dep set``` effect
 
-<div h="80%" flex="~ col justify-center items-center gap-y-4">
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```
+target ──> (key) ──> dep(Set)
+                       ├─ effectA  <──┐
+                       ├─ effectB      │
+                       └─ effectC      │
+                                       │
+effectA.deps: [depX, depY, dep(↑這個)] ┘  // 反向記錄：effectA 被哪些 dep 收集
+```
 
-```ts
-if (__DEV__) {
-  warn(
-    `Set operation on key "${String(key)}" failed: target is readonly.`,
-    target
-  );
+```js
+function track(target: object, key: PropertyKey) {
+  if (!activeEffect) return
+  // 1) 取到該 key 的 dep(Set<EffectFunction>)
+  let depsMap = bucket.get(target)
+  if (!depsMap) bucket.set(target, (depsMap = new Map()))
+  let dep = depsMap.get(key)
+  if (!dep) depsMap.set(key, (dep = new Set<EffectFunction>()))
+  // 2) 把 activeEffect 放進 dep
+  if (!dep.has(activeEffect)) {
+    dep.add(activeEffect)
+    // 3) 反向也記錄：這個 effect 被哪個 dep 收集
+    activeEffect.deps.push(dep)
+  }
+}
+
+```
+</div>
+
+
+---
+
+## 4.4 透過clean up 和 effectFn 進行比對
+- 因為 effect 的執行內容不是固定的，可以想像在每個 ```effect 內去做動態追蹤處理```
+- 在 effect 重跑前，先把自己從所有不再需要的 dep(Set) 裡刪掉
+- 下回資料更新 ```setter副作用觸發,同一 dep(Set) key值內就會移除掉不必要副作用(effect)```
+- clean up 內處理的作用，其實是對 dep set 進行移除 effect 動作
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+let activeEffect
+function effect(fn) {
+  const effectFn() = ()=>{
+    // 呼叫清理動作
+    cleanup(effectFn)
+    activeEffect = effectFn
+    fn()
+  }
+  effectFn.deps = []
+  effectFn
 }
 ```
 
-> Make sure to put dev-only code in **DEV** branches so they are tree-shakable.
->
-> 請務必將僅限開發的程式碼放在 **DEV** 分支中，以便它們可樹狀結構可搖動。
-
+```js
+function cleanup(effectFn) {
+  for (let i=0; i<effectFn.deps.length; i++) {
+    const deps = effectFn.deps[i]
+    // 移除目前執行的effect
+    deps.delete(effectFn)
+  }
+  effect.deps.length = 0
+}
+```
 </div>
 
 ---
 
-# Tree Shaking
+## 4.4 Recap - 透過effect dep 動態清除副作用
+- 簡單來說，動態分支清理透過 effect dep 來動態調整每次執行的 set 依賴集合
+![](/cleanup.jpg)
+https://juejin.cn/post/7170135046945243166
 
-<div h="80%" flex="~ col justify-center items-center gap-y-4">
-
-<img wa h-80 rounded src="https://miro.medium.com/v2/resize:fit:1188/format:webp/1*Y1T97xNyUWqs33v6kWhTNg.gif">
-
-</div>
-
----
-
-layout: iframe
-url: https://rollupjs.org/repl/?version=4.45.1&shareable=JTdCJTIyZXhhbXBsZSUyMiUzQW51bGwlMkMlMjJtb2R1bGVzJTIyJTNBJTVCJTdCJTIyY29kZSUyMiUzQSUyMmltcG9ydCUyMCU3QiUyMGNyZWF0ZUElMkMlMjBjcmVhdGVCJTJDJTIwY3JlYXRlQyUyMCU3RCUyMGZyb20lMjAnLiUyRmxpYi5qcyclM0IlNUNuJTVDbmNvbnN0JTIwdW51c2VkQSUyMCUzRCUyMGNyZWF0ZUEoKSU1Q25jb25zdCUyMHVudXNlZEIlMjAlM0QlMjAlMkYqJTQwX19QVVJFX18qJTJGJTIwY3JlYXRlQigpJTVDbmNvbnN0JTIwdW51c2VkQyUyMCUzRCUyMGNyZWF0ZUMoKSUyMiUyQyUyMmlzRW50cnklMjIlM0F0cnVlJTJDJTIybmFtZSUyMiUzQSUyMm1haW4uanMlMjIlN0QlMkMlN0IlMjJjb2RlJTIyJTNBJTIyZXhwb3J0JTIwZnVuY3Rpb24lMjBjcmVhdGVBKCklMjAlN0IlNUNuJTIwJTIwY29uc29sZS5sb2coJ3NpZGUlMjBlZmZlY3QnKSU1Q24lMjAlMjByZXR1cm4lMjAlN0IlN0QlNUNuJTdEJTVDbiU1Q25leHBvcnQlMjBmdW5jdGlvbiUyMGNyZWF0ZUIoKSUyMCU3QiU1Q24lMjAlMjBjb25zb2xlLmxvZygnc2lkZSUyMGVmZmVjdCcpJTVDbiUyMCUyMHJldHVybiUyMCU3QiU3RCU1Q24lN0QlNUNuJTVDbiUyRiolMjAlMjNfX05PX1NJREVfRUZGRUNUU19fJTIwKiUyRiU1Q25leHBvcnQlMjBmdW5jdGlvbiUyMGNyZWF0ZUMoKSUyMCU3QiU1Q24lMjAlMjBjb25zb2xlLmxvZygnc2lkZSUyMGVmZmVjdCcpJTVDbiUyMCUyMHJldHVybiUyMCU3QiU3RCU1Q24lN0QlMjIlMkMlMjJpc0VudHJ5JTIyJTNBZmFsc2UlMkMlMjJuYW1lJTIyJTNBJTIybGliLmpzJTIyJTdEJTVEJTJDJTIyb3B0aW9ucyUyMiUzQSU3QiUyMm91dHB1dCUyMiUzQSU3QiUyMmZvcm1hdCUyMiUzQSUyMmVzJTIyJTdEJTJDJTIydHJlZXNoYWtlJTIyJTNBdHJ1ZSU3RCU3RA==
-scale: 0.6
-
----
-
----
-
-# 構建產物
-
-- IIFE (CDN, unpkg)
-- ESM (捆綁器)
-- CJS (Node SSR)
 
 ---
 
