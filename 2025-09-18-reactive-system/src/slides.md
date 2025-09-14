@@ -542,220 +542,306 @@ function cleanup(effectFn) {
 ![](/cleanup.jpg)
 https://juejin.cn/post/7170135046945243166
 
-
 ---
 
-# TS 型別支持
-
-```ts {monaco} {height: '150px'}
-import { ref } from "vue";
-
-// 自動判斷為 number
-const a = ref(1);
-
-a.value = "1"; // error
-```
-
----
-
-## layout: center
-
-# 第三章：Vue.js 3 的設計思路
-
----
-
-<v-clicks>
-
-<div>
-
-## DOM 描述方式
-
-物件描述
-
-```ts
-const title = {
-  tag: "h1",
-  props: {
-    onClick: handler,
-  },
-  children: [{ tag: "span" }],
-};
-```
-
-</div>
-
-<div>
-
-Vue.js 模板 (hyperscript)
-
-````md magic-move {at:3}
-```vue
-<h1 @click="handler"><span></span></h1>
-```
-
-```ts
-import { h } from "vue";
-
-export default {
-  render() {
-    return h("h1", { onClick: handler }, [h("span")]);
-  },
-};
-```
-````
-
-</div>
-
-</v-clicks>
-
----
-
-## layout: fact
-
-## JavaScript 物件來描述 UI = 虛擬 DOM
-
----
-
-## 渲染器
-
-```mermaid
-graph LR
-    A["虛擬 DOM<br/>"] --> B["渲染器"]
-    B --> C["真實 DOM"]
-```
-
----
-
-## 渲染函式
-
-<div h-full>
-
-<div pb-6 h-full of-auto>
-
-```ts
-function renderer(vnode, container) {
-  // 使用 vnode.tag 作為標籤名稱創建 DOM 元素
-  const el = document.createElement(vnode.tag);
-  // 遍歷 vnode.props，將屬性、事件添加到 DOM 元素
-  for (const key in vnode.props) {
-    if (/^on/.test(key)) {
-      // 如果 key 以 on 開頭，說明它是事件
-      el.addEventListener(
-        key.substr(2).toLowerCase(), // 事件名稱 onClick ---> click
-        vnode.props[key] // 事件處理函數
-      );
-    }
-  }
-
-  // 處理 children
-  if (typeof vnode.children === "string") {
-    // 如果 children 是字串，說明它是元素的文本子節點
-    el.appendChild(document.createTextNode(vnode.children));
-  } else if (Array.isArray(vnode.children)) {
-    // 遞歸地調用 renderer 函數渲染子節點，使用當前元素 el 作為掛載點
-    vnode.children.forEach((child) => renderer(child, el));
-  }
-
-  // 將元素添加到掛載點下
-  container.appendChild(el);
-}
-```
-
-</div>
-
-</div>
-
----
-
-## 組件的本質
-
-```ts
-const MyComponent = {
-  render() {
-    return {
-      tag: "div",
-      props: {
-        onClick: () => alert("hello"),
-      },
-      children: "click me",
-    };
-  },
-};
-```
-
----
-
-## mountElement
-
-```ts
-function mountElement(vnode, container) {
-  // 使用 vnode.tag 作為標籤名稱創建 DOM 元素
-  const el = document.createElement(vnode.tag);
-  // 遍歷 vnode.props，將屬性、事件添加到 DOM 元素
-  for (const key in vnode.props) {
-    if (/^on/.test(key)) {
-      // 如果 key 以字串 on 開頭，說明它是事件
-      el.addEventListener(
-        key.substr(2).toLowerCase(), // 事件名稱 onClick ---> click
-        vnode.props[key] // 事件處理函數
-      );
-    }
-  }
-  // 處理 children
-  if (typeof vnode.children === "string") {
-    // 如果 children 是字串，說明它是元素的文本子節點
-    el.appendChild(document.createTextNode(vnode.children));
-  } else if (Array.isArray(vnode.children)) {
-    // 遞迴地調用 renderer 函數渲染子節點，使用當前元素 el 作為掛載點
-    vnode.children.forEach((child) => renderer(child, el));
-  }
-  // 將元素添加到掛載點下
-  container.appendChild(el);
-}
-```
-
----
-
-## 模板的工作原理
-
-````md magic-move {at:2}
-```vue
+## 4.5 巢狀的 effect 與 effect 堆疊
+- 為什麼 effect 需要考量```嵌套設計```?
+- 每一段元件經過編譯後，都有自己的 ```render function``` 和 ```effectScope```
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
 <template>
-  <div @click="handler">click me</div>
+  <Foo>
+    <Bar />
+  </Foo>
 </template>
+
+// render function
+effect(() => {
+  Foo.render();
+  effect(() => {
+    Bar.render();
+  });
+});
+
 ```
 
 ```js
-import { h } from "vue";
-export function render() {
-  return h("div", { onClick: handler }, "click me");
+const data = reactive({ a: 1, b: 2 });
+
+let x, y;
+
+const effect2 = () => {
+  console.log('run effect2')
+  y = data.b;
+};
+
+const effect1 = () => {
+  console.log('run effect1');
+  effect(effect2)
+  x = data.a;
+}
+
+effect(effect1);
+
+```
+</div>
+
+---
+
+## 4.5 巢狀 effect 內 activeEffect 重置
+- 在巢狀呼叫不同 effect 時， 最終 ```activeEffect 會以最內層 effect 為主```
+- activeEffect 需要重置清理，避免再次呼叫時依賴錯誤，新增 ```effectStack``` 紀錄任務排序
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+
+const effect = (fn: Function) => {
+  const effectFn = () => {
+    cleanup(effectFn);
+    // 這裡會以最內層的effect為主
+    activeEffect = effectFn;
+    fn();
+  }
+  effectFn.deps = [] as Array<Set<EffectFunction>>;
+  effectFn();
 }
 ```
-````
+```ts
+
+let activeEffect: EffectFunction | null = null;
+// 引入了一个数组，副作用函数栈，用来存储当前在执行中的副作用函数
+const effectStack: Array<EffectFunction> = [];
+const bucket: WeakMap<any, Map<string, Set<EffectFunction>>> = new WeakMap();
+
+export const effect = (fn: Function) => {
+  const effectFn = () => {
+    cleanup(effectFn);
+    activeEffect = effectFn;
+    // 将当前副作用函数压入栈中
+    effectStack.push(effectFn);
+    fn();
+    // 副作用函数执行完之后再将其从栈中弹出
+    effectStack.pop();
+    // activeEffect 始终指向栈顶
+    activeEffect = effectStack[effectStack.length - 1]
+  }
+  effectFn.deps = [] as Array<Set<EffectFunction>>;
+  effectFn();
+}
+
+```
+
+</div>
 
 ---
 
-## Vue.js 是各模組組成的有機整體
+## 4.6 避免無限遞迴循環?
 
-<div class="grid grid-cols-1 gap-4 mt-6">
+- 如果在一個 effect 內發生```讀取(getter)```和```賦值(setter)```，會發生什麼事?
 
-<div class="bg-gray-800/30 p-4 rounded">
-<h3 class="text-sm font-bold mb-2">編譯器</h3>
-<p class="text-gray-300 text-xs mb-1">分析模板，識別靜態與動態內容</p>
-<p class="text-xs text-gray-400">產生 patchFlags 等優化資訊</p>
-</div>
+```mermaid
+flowchart LR
+    A["effect()<br/>total = price * quantity"] -->|get| B["price<br/>quantity"]
+    B -->|set| C["price = 1500<br/>quantity = 3"]
+    C -->|trigger| A
 
-<div class="bg-gray-800/30 p-4 rounded">
-<h3 class="text-sm font-bold mb-2">渲染器</h3>
-<p class="text-gray-300 text-xs mb-1">接收編譯器資訊，最小化更新範圍</p>
-<p class="text-xs text-gray-400">只更新真正變化的部分</p>
-</div>
+    style A fill:black,stroke:#1976d2,stroke-width:2px
+    style B fill:#black,stroke:#f57c00,stroke-width:2px
+    style C fill:#black,stroke:#388e3c,stroke-width:2px
+```
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
 
+```js
+effect(()=>{
+  obj.foo = obj.foo + 1 
+})
+
+```
+
+```js
+watch(data,()=>{
+  data.value ++
+})
+```
 </div>
 
 ---
 
-# 參考資料
+## 4.6 避免無限遞迴循環-比較activeEffect
+
+- 排除和自己相同的 effect
+
+```js
+const trigger = (target: any, key: string) => {
+  const depsMap = bucket.get(target);
+  if (depsMap) {
+    const effects = depsMap.get(key);
+    if (effects) {
+      const effectsToRun: Set<EffectFunction> = new Set();
+      effects.forEach(fn => {
+        // 增加判断
+        if (fn !== activeEffect) {
+          effectsToRun.add(fn);
+        }
+      })
+      effectsToRun.forEach(fn => fn());
+    }
+  }
+};
+
+```
+---
+layout: center
+---
+
+# 4.7 調度器(scheduler)
+
+---
+
+## 4.7 為什麼需要調度器
+
+- 效能：去重、批次執行，避免重複渲染或計算，能不能在創建 Virtual DOM 前讓資料準備好
+
+- 正確性：控制副作用執行時機，避免死循環或錯誤順序
+
+- 彈性：讓開發者自訂副作用的調度策略
+
+```js
+const data = reactive({ foo: 0 });
+
+const effectFn = () => console.log('data.foo--->', data.foo);
+
+effect(effectFn, {
+  scheduler: (fn?: Function) => {
+    // 我希望讓副作用執行時機點慢一點
+    setTimeout(() => {
+      fn && fn();
+    }, 1000);
+  }
+});
+data.foo = 1;
+
+```
+---
+
+## 4.7 調度器-批次更新(batch update)
+- 控制過度狀態執行次數，保留最新的資料狀態
+- count 由 1 --> 2 是一個資料變化過程，但整個畫面會需要以最終 count = 3 為主
+
+```js
+import { ref, watch } from 'vue';
+
+const count = ref(0);
+
+// watch 監測 count 的變化
+watch(count, (newVal) => {
+  console.log('Count updated:', newVal);
+});
+
+count.value++; // 不會立即觸發 DOM 更新
+count.value++; // 還是不會立即觸發
+count.value++; // 直到微任務執行時，統一處理
+```
+
+---
+
+## 4.7 調度器-flushJob 簡易版
+
+- 簡易的調度器可以用 ```jobQue``` 進行 effect 收集，在利用```微任務(micro-task)```一起批次執行
+- 當然源碼中牽涉到更多細節，例如父子元件透過 id 保持先後順序等
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+// 任務儲列
+const jobQue = new Set()
+
+const data = reactive({ foo: 0 });
+const effectFn = () => console.log('data.foo--->', data.foo); // data.foo---> 0
+
+// 是否正在標記
+let isInvolving = false;
+
+effect(effectFn, {
+  scheduler: (fn?: Function) => {
+    if (!fn) return;
+    if (!isInvolving) {
+      // 如果不在標記流程
+      isInvolving = true;
+      // 微任務排程進行
+      Promise.resolve().then(() => {
+        // 執行副作用
+        jobQue.forEach(job=>job())
+        isInvolving = false;
+      });
+    }
+  }
+});
+
+```
+
+```js
+effect(()=>{
+  console.log(obj.foo)
+},{
+  scheduler(fn) {
+    jobQue.add(fn)
+    flushJob()
+  }
+})
+
+data.foo = 1;
+data.foo = 2;
+data.foo = 3; // data.foo---> 3
+
+```
+</div>
+
+---
+
+## 4.7 補充-元件間的id (父元件id < 小於元組件id)
+
+- 在[源碼](https://github.com/vuejs/core/blob/75220c79/packages/runtime-core/src/component.ts) ```createComponentInstance```實作中，子元件uid會以父元件的uid + 1 為主
+- flusJob 等調度器在一併執行任務前，會針對不同元件間透過uid排序，確保由父到子之間的副作用執行順序
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+export function createComponentInstance(
+  vnode: VNode,
+  parent: ComponentInternalInstance | null,
+  suspense: SuspenseBoundary | null,
+): ComponentInternalInstance {
+  const type = vnode.type as ConcreteComponent
+  // inherit parent app context - or - if root, adopt from root vnode
+  const appContext =
+    (parent ? parent.appContext : vnode.appContext) || emptyAppContext
+
+  const instance: ComponentInternalInstance = {
+    uid: uid++,
+    vnode,}
+  /** 略 */
+```
+
+``` js
+export function queueJob(job: SchedulerJob): void {
+  if (!(job.flags! & SchedulerJobFlags.QUEUED)) {
+    const jobId = getId(job)
+    const lastJob = queue[queue.length - 1]
+    if (
+      !lastJob ||
+      // fast path when the job id is larger than the tail
+      (!(job.flags! & SchedulerJobFlags.PRE) && jobId >= getId(lastJob))
+    ) {
+      queue.push(job)
+    } else {
+      queue.splice(findInsertionIndex(jobId), 0, job)
+    }
+
+    job.flags! |= SchedulerJobFlags.QUEUED
+
+    queueFlush()
+  }
+}
+```
+</div>
+
+---
 
 - [Rollup 的 Tree Shaking](https://cn.rollupjs.org/configuration-options/#pure)
 - [原來程式碼打包也有這麼多眉角 - 淺談 Tree Shaking 機制](https://medium.com/starbugs/%E5%8E%9F%E4%BE%86%E7%A8%8B%E5%BC%8F%E7%A2%BC%E6%89%93%E5%8C%85%E4%B9%9F%E6%9C%89%E9%80%99%E9%BA%BC%E5%A4%9A%E7%9C%89%E8%A7%92-%E6%B7%BA%E8%AB%87-tree-shaking-%E6%A9%9F%E5%88%B6-8375d35d87b2)
