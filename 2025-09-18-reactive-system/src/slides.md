@@ -842,6 +842,13 @@ export function queueJob(job: SchedulerJob): void {
 </div>
 
 ---
+layout: center
+---
 
-- [Rollup 的 Tree Shaking](https://cn.rollupjs.org/configuration-options/#pure)
-- [原來程式碼打包也有這麼多眉角 - 淺談 Tree Shaking 機制](https://medium.com/starbugs/%E5%8E%9F%E4%BE%86%E7%A8%8B%E5%BC%8F%E7%A2%BC%E6%89%93%E5%8C%85%E4%B9%9F%E6%9C%89%E9%80%99%E9%BA%BC%E5%A4%9A%E7%9C%89%E8%A7%92-%E6%B7%BA%E8%AB%87-tree-shaking-%E6%A9%9F%E5%88%B6-8375d35d87b2)
+# 4.8 Computed
+---
+layout: center
+---
+
+# 4.9 Watcher
+---
