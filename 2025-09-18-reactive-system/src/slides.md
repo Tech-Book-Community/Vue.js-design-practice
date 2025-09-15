@@ -796,7 +796,7 @@ data.foo = 3; // data.foo---> 3
 
 ---
 
-## 4.7 補充-元件間的id (父元件id < 小於元組件id)
+## 4.7 補充-元件間的id (父元件id < 小於子元件id)
 
 - 在[源碼](https://github.com/vuejs/core/blob/75220c79/packages/runtime-core/src/component.ts) ```createComponentInstance```實作中，子元件uid會以父元件的uid + 1 為主
 - flusJob 等調度器在一併執行任務前，會針對不同元件間透過uid排序，確保由父到子之間的副作用執行順序
@@ -847,8 +847,196 @@ layout: center
 
 # 4.8 Computed
 ---
+
+## 4.8 computed lazy 延遲特性
+
+- 延遲 (lazy) 的特性指的是```副作用的收集執行不是立刻有變化就反應```，通常是有用到```資料(讀取)```時才執行
+- 利用 ```getter 函式```，做進一步資料讀取的延遲
+
+
+```js
+const effectFn = effect(
+  () => obj.foo + obj.bar, // getter
+  {
+    lazy: true
+  }
+)
+
+```
+
+---
+
+## 4.8 computed 初步雛形
+- 先透過一層 effectFn 包裝需要執行的副作用，透過```調度器 options(lazy) ```設定達到延遲執行
+- 延遲時機點 - 響應式資料```讀取```時觸發依賴項重新收集 
+- 雖然目前還沒辦法做到緩存 cache
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+function effect(fn, options={}) {
+  const effectFn = () => {
+    cleanup(effectFn) // 清理分支
+    activeEffect = effectFn
+    effectStack.push(effectFn) 
+    const res = fn() // 執行effect
+    effectStack.pop()
+    // 重新設定activeEffect (巢狀effect)
+    activeEffect = effectStack[effectStack.length - 1] 
+  }
+  effectFn.options  = options
+  effectFn.deps = []
+
+  // 依據調度器設定返回結果
+  if (!options.lazy) {
+    effectFn()
+  }
+  return effect // 返回 getter
+}
+```
+
+```js
+function computed(getter) {
+  // 先把 effect 以 getter 形式 包裝
+  const effectFn = effect(getter, {
+    lazy
+  })
+  // obj getter/setter 包裝
+  const obj = {
+    get value () {
+      return effectFn()
+    }
+    set value () {
+      /**略 */
+    }
+    return obj
+  } 
+}
+```
+</div>
+
+---
+
+## 4.8 computed 緩存特性
+- 設定 ```dirty```決定是否重新觸發 getter 計算
+- computed getter 的重新執行決定於```內部依賴的響應式資料變化```
+- computed 中的```調度器(scheduler)```，也會將 dirty 設定為 true 重新執行
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+function computed(getter) {
+  // 新增 dirty 和 cache value
+  let value
+  let dirty
+  // 先把 effect 以 getter 形式 包裝
+  const effectFn = effect(getter, {
+    lazy
+  },
+  scheduler() {
+    if (!dirty) {
+      dirty = true
+      // 通知下游依賴computed value 的其他副作用 需要更新effect
+      trigger(obj,'value')
+    }
+  }
+  )
+}
+
+```
+
+```js
+ // obj getter/setter 包裝
+  const obj = {
+    get value () {
+      if (dirty) {
+        value = effectFn()
+        dirty = false
+      }
+    }
+    set value () {
+      /**略 */
+    }
+    return obj
+  } 
+```
+</div>
+
+---
+
+## 4.8 響應式資料和computedRef連結
+
+- track --> 上游資料變化--> notify dirty --> [refreshComputed](https://github.com/vuejs/core/blob/main/packages/reactivity/src/effect.ts#L365) --> 更新 computed 資料-->通知下游
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+ notify(): true | void {
+    this.flags |= EffectFlags.DIRTY
+    if (
+      !(this.flags & EffectFlags.NOTIFIED) &&
+      // avoid infinite self recursion
+      activeSub !== this
+    ) {
+      batch(this, true)
+     return true
+
+    } else if (__DEV__) {
+      // TODO warn
+    }
+  }
+  get value(): T {
+    const link = __DEV__
+      ? this.dep.track({
+          target: this,
+          type: TrackOpTypes.GET,
+          key: 'value',
+        })
+      : this.dep.track()
+    refreshComputed(this)
+    // sync version after evaluation
+    if (link) {
+      link.version = this.dep.version
+    }
+    return this._value
+  }
+```
+
+``` js
+export function refreshComputed(computed: ComputedRefImpl): undefined {
+  /**略 上面是一些flag判定 */
+  computed.flags |= EffectFlags.RUNNING
+  const dep = computed.dep
+  const prevSub = activeSub
+  const prevShouldTrack = shouldTrack
+  activeSub = computed
+  shouldTrack = true
+  try {
+    prepareDeps(computed)
+    const value = computed.fn(computed._value) // 這裡觸發原本computed getter 更新value
+    if (dep.version === 0 || hasChanged(value, computed._value)) {
+      computed.flags |= EffectFlags.EVALUATED
+      computed._value = value
+      dep.version++
+    }
+  } catch (err) {
+    dep.version++
+    throw err
+  } finally {
+    activeSub = prevSub
+    shouldTrack = prevShouldTrack
+    cleanupDeps(computed)
+    computed.flags &= ~EffectFlags.RUNNING
+  }
+}
+```
+</div>
+
+
+---
 layout: center
 ---
 
 # 4.9 Watcher
+---
+# watcher
+
+
 ---
