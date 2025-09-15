@@ -1029,14 +1029,223 @@ export function refreshComputed(computed: ComputedRefImpl): undefined {
 ```
 </div>
 
+---
+
+## computed 可以取得舊值
+
+- Vue 3.4+ 以上版本，可以在 getter 參數裡面取得 previousData 
+
+```js
+<script setup>
+import { ref, computed } from 'vue'
+
+const count = ref(2)
+const alwaysSmall = computed((previous) => {
+  if (count.value <= 3) {
+    return count.value
+  }
+
+  return previous
+})
+</script>
+```
 
 ---
 layout: center
 ---
 
-# 4.9 Watcher
+# 4.9 watch 的實作原理
 ---
-# watcher
 
+## 4.9 watch 的設計和監聽來源
+- ```watch``` 跟 ```computed``` 聚焦重點不同，著重在 ```調度器(scheduler)``` 執行時機點或callback設計的不同
+- ```ref``` 或 ```reactive``` 在 source getter 上對於物件監聽行為不同，有不同的封裝 ```traverse 遍例功能```
+
+```js
+function watch(source, cb) {
+  effect (()=> source.foo) {
+    scheduler() {
+      cb()
+    }
+  }
+}
+
+```
+```js
+  const reactiveGetter = (source: object) => {
+    // traverse will happen in wrapped getter below
+    if (deep) return source
+    // for `deep: false | 0` or shallow reactive, only traverse root-level properties
+    if (isShallow(source) || deep === false || deep === 0)
+      return traverse(source, 1)
+    // for `deep: undefined` on a reactive object, deeply traverse all properties
+    return traverse(source)
+  }
+```
+
+
+---
+
+## 4.9 watch 的新舊值
+
+- watch 新舊值取得也和 computed 設計類似，在執行 ```effect scheduler``` 前將 ```舊值```傳入```回調函式(cb)```中
+
+```js
+function watch(source, cb) {
+  let getter
+  if (type of source === 'function') {
+    getter = source
+  } else {
+    getter = () => traverse(source)
+  }
+  // 新舊值定義
+  let oldValue, newValue
+  // effect 會延遲執行
+  const effectFn = effect(
+    () => getter(),
+    {
+      lazy: true,
+      scheduler() {
+        newValue = effectFn()
+        cb(newValue, oldValue)
+        oldValue = newValue // 同步新舊值
+      }
+    }
+  )
+  oldValue = effectFn() // 先同步執行取得舊值
+}
+
+```
+
+---
+
+## 4.10 watch 執行回調的時機點
+
+- ```Sync 模式``` (flush: 'sync'), 調度器 ```baseWatchOptions``` 會多次執行 effect
+- ```Post 模式``` (flush: 'post'), `調度器 ```queuePostRenderEffect```，在 Virtual DOM 更新後執行 
+- ```Pre 模式``` (flush: 'pre' - 預設)， 調度器 ```queueJob ```，會批次收集依賴一起執行
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start">
+```js
+function watch(source, cb) {
+  const job = () => {
+    newValue = effectFn()
+    cb(newValue, oldValue)
+    oldValue = newValue // 同步新舊值
+  }
+  // 新舊值定義
+  let oldValue, newValue
+}
+```
+```js
+// effect 會延遲執行
+  const effectFn = effect(
+    () => getter(),
+    {
+      lazy: true,
+      scheduler: () => {
+        if (options.flush === 'post') {
+          const p = Promise.resolve(
+          p.then(job)
+          )
+        } else {
+          job()
+        }
+      }
+    }
+  )
+  // immediate 模式
+  if (options.immediate) {
+    job()
+  } else {
+    oldValue = effectFn()
+  }
+```
+</div>
+
+---
+
+## 4.11 過期副作用清理
+
+- 如果 watch 啟動是非同步處理，可能會有```競態狀況(race condition)```發生，設計上透過提供```onInvalidate```，在每一次執行真正的cb前執行清理邏輯。
+
+```js
+const keyword = ref('')
+
+watch(keyword, async (newVal, oldVal, onInvalidate) => {
+  let cancelled = false
+
+  // 當 keyword 改變時，註冊清理函式
+  onInvalidate(() => {
+    cancelled = true
+    console.log('上一次請求被取消')
+  })
+
+  const res = await fetch(`/api/search?q=${newVal}`)
+  if (!cancelled) {
+    console.log('請求結果：', await res.json())
+  }
+})
+```
+
+
+---
+
+## Vue 3.5 + 提供 onWatcherCleanup API清理副作用
+
+```js
+
+import { watch, onWatcherCleanup } from 'vue'
+
+watch(id, (newId) => {
+  const controller = new AbortController()
+
+  fetch(`/api/${newId}`, { signal: controller.signal }).then(() => {
+    // callback logic
+  })
+
+  onWatcherCleanup(() => {
+    // abort stale request
+    controller.abort()
+  })
+})
+```
+
+---
+layout: center
+---
+
+# 總結
+
+---
+
+## 響應式系統核心觀念
+
+🔄 核心循環  
+依賴收集 (Track) → 觸發更新 (Trigger) → 調度執行 (Schedule)  
+
+📊 資料結構  
+WeakMap: target → Map
+Map: key → Set
+Set: effect 集合
+
+🎯 依賴追蹤  
+Proxy 攔截 get/set 操作
+透過 activeEffect 建立依賴關係
+雙向綁定：effect ↔ deps
+
+🧹 effect動態智能清理  
+分支清理避免多餘依賴
+巢狀 effect 堆疊管理
+防止無限循環
+
+📅 調度器控制  
+Sync: 立即執行
+Pre: 批次更新（預設）
+Post: DOM 更新後執行
+
+💾 進階封裝API  
+Computed: 延遲 + 緩存
+Watch: 新舊值比較 + 副作用清理
 
 ---
