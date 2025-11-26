@@ -5,7 +5,7 @@ css: unocss
 colorSchema: dark
 transition: fade-out
 title: Vue.js 設計實戰 - Diff 演算法深入解析
-exportFilename: Diff-Algorithms (Chapter 9, 10).pdf
+exportFilename: Diff-Algorithms (Chapter 9, 10)
 lineNumbers: false
 drawings:
   persist: false
@@ -16,14 +16,40 @@ glowSeed: 233
 routerMode: hash
 ---
 
+<div translate-x--15>
+
 <h1>
-Vue.js 設計實戰：<br />簡單與雙端 Diff 演算法深入解析
+Vue.js 設計實戰
 </h1>
 
-Deep Dive into Vue.js Diff Algorithms
+簡單與雙端 Diff 演算法深入解析
 
-Benny
+</div>
+
+---
+src: ./pages/9-0.md
+---
 
 ---
 src: ./pages/9-1.md
+---
+
+---
+src: ./pages/9-2.md
+---
+
+---
+src: ./pages/9-3.md
+---
+
+---
+src: ./pages/9-4.md
+---
+
+---
+src: ./pages/9-5.md
+---
+
+---
+src: ./pages/9-6.md
 ---
