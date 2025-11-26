@@ -1,99 +1,99 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed } from 'vue'
 
 // Track current click step using Slidev's $clicks
 const props = defineProps<{
-  clicks: number;
-}>();
+  clicks: number
+}>()
 
 // Node data structure
 interface Node {
-  key: string;
-  oldIndex: number;
-  y: number;
-  highlight: boolean;
-  mounting?: boolean;
-  anchor?: boolean; // Mark as anchor node (the node after which a new node will be inserted)
+  key: string
+  oldIndex: number
+  y: number
+  highlight: boolean
+  mounting?: boolean
+  anchor?: boolean // Mark as anchor node (the node after which a new node will be inserted)
 }
 
 // Connection data structure
 interface Connection {
-  fromY: number;
-  toY: number;
-  show: boolean;
+  fromY: number
+  toY: number
+  show: boolean
 }
 
 // Old children - 只有 2 個節點
 const oldChildren = [
-  { key: "p-1", index: 0, y: 0 },
-  { key: "p-3", index: 1, y: 80 },
-];
+  { key: 'p-1', index: 0, y: 0 },
+  { key: 'p-3', index: 1, y: 80 },
+]
 
 // New children - 有 4 個節點，p-4 和 p-2 是新增的
 // p-4 是第一個且是新增的，可以展示 container.firstChild 的場景
 const newChildren = [
-  { key: "p-4", index: 0, y: 0 },
-  { key: "p-3", index: 1, y: 80 },
-  { key: "p-2", index: 2, y: 160 },
-  { key: "p-1", index: 3, y: 240 },
-];
+  { key: 'p-4', index: 0, y: 0 },
+  { key: 'p-3', index: 1, y: 80 },
+  { key: 'p-2', index: 2, y: 160 },
+  { key: 'p-1', index: 3, y: 240 },
+]
 
 // Calculate current state based on clicks
 // 新流程：newChildren = [p-4, p-3, p-2, p-1]
 // p-4 是第一個且是新增的，展示 container.firstChild 場景
 const currentState = computed(() => {
-  const clicks = props.clicks;
+  const clicks = props.clicks
 
   // Initialize all node highlight states
-  const newHighlight = [false, false, false, false];
-  const oldHighlight = [false, false];
-  const domHighlight = [false, false, false, false];
+  const newHighlight = [false, false, false, false]
+  const oldHighlight = [false, false]
+  const domHighlight = [false, false, false, false]
 
   // Initial DOM order - 只有 2 個節點
   let domNodes: Node[] = [
-    { key: "p-1", oldIndex: 0, y: 0, highlight: false, mounting: false },
-    { key: "p-3", oldIndex: 1, y: 80, highlight: false, mounting: false },
-  ];
+    { key: 'p-1', oldIndex: 0, y: 0, highlight: false, mounting: false },
+    { key: 'p-3', oldIndex: 1, y: 80, highlight: false, mounting: false },
+  ]
 
-  let lastIndex = 0;
-  let message = "初始狀態：真實 DOM 順序 [p-1, p-3]";
-  let connection: Connection = { fromY: 0, toY: 0, show: false };
+  let lastIndex = 0
+  let message = '初始狀態：真實 DOM 順序 [p-1, p-3]'
+  let connection: Connection = { fromY: 0, toY: 0, show: false }
 
   // ===== 步驟 1：處理 p-4（新節點，第一個位置）=====
   if (clicks >= 1) {
-    newHighlight[0] = true; // p-4 is at newChildren index 0
-    message = "步驟 1：處理新 children[0] = p-4";
+    newHighlight[0] = true // p-4 is at newChildren index 0
+    message = '步驟 1：處理新 children[0] = p-4'
   }
 
   if (clicks >= 2) {
-    message = "p-4 在舊 children 中不存在，這是新節點！";
+    message = 'p-4 在舊 children 中不存在，這是新節點！'
   }
 
   if (clicks >= 3) {
-    message = "j === 0，這是第一個節點，沒有 prevVNode";
+    message = 'j === 0，這是第一個節點，沒有 prevVNode'
   }
 
   if (clicks >= 4) {
     // Mark p-1 as anchor (it's container.firstChild)
     domNodes = [
       {
-        key: "p-1",
+        key: 'p-1',
         oldIndex: 0,
         y: 0,
         highlight: false,
         mounting: false,
         anchor: true,
       },
-      { key: "p-3", oldIndex: 1, y: 80, highlight: false, mounting: false },
-    ];
-    message = "使用 container.firstChild 作為錨點（anchor）";
+      { key: 'p-3', oldIndex: 1, y: 80, highlight: false, mounting: false },
+    ]
+    message = '使用 container.firstChild 作為錨點（anchor）'
   }
 
   if (clicks >= 5) {
     // Mount p-4 at the beginning
     domNodes = [
       {
-        key: "p-4",
+        key: 'p-4',
         oldIndex: -1,
         y: 0,
         highlight: true,
@@ -101,7 +101,7 @@ const currentState = computed(() => {
         anchor: false,
       },
       {
-        key: "p-1",
+        key: 'p-1',
         oldIndex: 0,
         y: 80,
         highlight: false,
@@ -109,182 +109,182 @@ const currentState = computed(() => {
         anchor: false,
       },
       {
-        key: "p-3",
+        key: 'p-3',
         oldIndex: 1,
         y: 160,
         highlight: false,
         mounting: false,
         anchor: false,
       },
-    ];
-    message = "✓ p-4 插入到最前面！DOM 順序變為 [p-4, p-1, p-3]";
+    ]
+    message = '✓ p-4 插入到最前面！DOM 順序變為 [p-4, p-1, p-3]'
   }
 
   // ===== 步驟 2：處理 p-3 =====
   if (clicks >= 6) {
-    newHighlight[0] = false;
-    newHighlight[1] = true; // p-3 is at newChildren index 1
+    newHighlight[0] = false
+    newHighlight[1] = true // p-3 is at newChildren index 1
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 80, highlight: false, mounting: false },
-      { key: "p-3", oldIndex: 1, y: 160, highlight: false, mounting: false },
-    ];
-    message = "步驟 2：處理新 children[1] = p-3";
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 80, highlight: false, mounting: false },
+      { key: 'p-3', oldIndex: 1, y: 160, highlight: false, mounting: false },
+    ]
+    message = '步驟 2：處理新 children[1] = p-3'
   }
 
   if (clicks >= 7) {
-    oldHighlight[1] = true; // p-3 is at old children index 1
+    oldHighlight[1] = true // p-3 is at old children index 1
     connection = {
       fromY: 80 + 40, // new node p-3's y (index 1)
       toY: 80 + 40, // old node p-3's y (index 1)
       show: true,
-    };
-    message = "找到 p-3 在舊 children 的索引 = 1";
+    }
+    message = '找到 p-3 在舊 children 的索引 = 1'
   }
 
   if (clicks >= 8) {
-    message = "索引 1 >= lastIndex 0，不需要移動";
+    message = '索引 1 >= lastIndex 0，不需要移動'
   }
 
   if (clicks >= 9) {
-    lastIndex = 1;
-    message = "lastIndex 更新為 1";
+    lastIndex = 1
+    message = 'lastIndex 更新為 1'
   }
 
   // ===== 步驟 3：處理 p-2（新節點）=====
   if (clicks >= 10) {
-    newHighlight[1] = false;
-    oldHighlight[1] = false;
-    connection.show = false;
-    newHighlight[2] = true; // p-2 is at newChildren index 2
-    lastIndex = 1;
-    message = "步驟 3：處理新 children[2] = p-2";
+    newHighlight[1] = false
+    oldHighlight[1] = false
+    connection.show = false
+    newHighlight[2] = true // p-2 is at newChildren index 2
+    lastIndex = 1
+    message = '步驟 3：處理新 children[2] = p-2'
   }
 
   if (clicks >= 11) {
-    lastIndex = 1;
-    message = "p-2 在舊 children 中不存在，這是新節點！";
+    lastIndex = 1
+    message = 'p-2 在舊 children 中不存在，這是新節點！'
   }
 
   if (clicks >= 12) {
     // Mark p-3 as anchor
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 80, highlight: false, mounting: false },
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 80, highlight: false, mounting: false },
       {
-        key: "p-3",
+        key: 'p-3',
         oldIndex: 1,
         y: 160,
         highlight: false,
         mounting: false,
         anchor: true,
       },
-    ];
-    lastIndex = 1;
-    message = "prevVNode 是 p-3，掛載到 p-3 後面";
+    ]
+    lastIndex = 1
+    message = 'prevVNode 是 p-3，掛載到 p-3 後面'
   }
 
   if (clicks >= 13) {
     // Mount p-2 after p-3
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 80, highlight: false, mounting: false },
-      { key: "p-3", oldIndex: 1, y: 160, highlight: false, mounting: false },
-      { key: "p-2", oldIndex: -1, y: 240, highlight: true, mounting: true },
-    ];
-    lastIndex = 1;
-    message = "✓ p-2 已掛載！DOM 順序變為 [p-4, p-1, p-3, p-2]";
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 80, highlight: false, mounting: false },
+      { key: 'p-3', oldIndex: 1, y: 160, highlight: false, mounting: false },
+      { key: 'p-2', oldIndex: -1, y: 240, highlight: true, mounting: true },
+    ]
+    lastIndex = 1
+    message = '✓ p-2 已掛載！DOM 順序變為 [p-4, p-1, p-3, p-2]'
   }
 
   // ===== 步驟 4：處理 p-1 =====
   if (clicks >= 14) {
-    newHighlight[2] = false;
-    newHighlight[3] = true; // p-1 is at newChildren index 3
+    newHighlight[2] = false
+    newHighlight[3] = true // p-1 is at newChildren index 3
     // 保持 DOM 順序，p-1 仍在 y: 80
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 80, highlight: false, mounting: false },
-      { key: "p-3", oldIndex: 1, y: 160, highlight: false, mounting: false },
-      { key: "p-2", oldIndex: -1, y: 240, highlight: false, mounting: false },
-    ];
-    lastIndex = 1;
-    message = "步驟 4：處理新 children[3] = p-1";
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 80, highlight: false, mounting: false },
+      { key: 'p-3', oldIndex: 1, y: 160, highlight: false, mounting: false },
+      { key: 'p-2', oldIndex: -1, y: 240, highlight: false, mounting: false },
+    ]
+    lastIndex = 1
+    message = '步驟 4：處理新 children[3] = p-1'
   }
 
   if (clicks >= 15) {
-    oldHighlight[0] = true; // p-1 is at old children index 0
+    oldHighlight[0] = true // p-1 is at old children index 0
     // p-1 仍在 y: 80，高亮顯示
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 80, highlight: true, mounting: false },
-      { key: "p-3", oldIndex: 1, y: 160, highlight: false, mounting: false },
-      { key: "p-2", oldIndex: -1, y: 240, highlight: false, mounting: false },
-    ];
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 80, highlight: true, mounting: false },
+      { key: 'p-3', oldIndex: 1, y: 160, highlight: false, mounting: false },
+      { key: 'p-2', oldIndex: -1, y: 240, highlight: false, mounting: false },
+    ]
     connection = {
       fromY: 240 + 40, // new node p-1's y (index 3)
       toY: 0 + 40, // old node p-1's y (index 0)
       show: true,
-    };
-    lastIndex = 1;
-    message = "找到 p-1 在舊 children 的索引 = 0";
+    }
+    lastIndex = 1
+    message = '找到 p-1 在舊 children 的索引 = 0'
   }
 
   if (clicks >= 16) {
     // p-1 仍在 y: 80，準備移動
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 80, highlight: true, mounting: false },
-      { key: "p-3", oldIndex: 1, y: 160, highlight: false, mounting: false },
-      { key: "p-2", oldIndex: -1, y: 240, highlight: false, mounting: false },
-    ];
-    oldHighlight[0] = true;
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 80, highlight: true, mounting: false },
+      { key: 'p-3', oldIndex: 1, y: 160, highlight: false, mounting: false },
+      { key: 'p-2', oldIndex: -1, y: 240, highlight: false, mounting: false },
+    ]
+    oldHighlight[0] = true
     connection = {
       fromY: 240 + 40,
       toY: 0 + 40,
       show: true,
-    };
-    lastIndex = 1;
-    message = "索引 0 < lastIndex 1，需要移動！";
+    }
+    lastIndex = 1
+    message = '索引 0 < lastIndex 1，需要移動！'
   }
 
   if (clicks >= 17) {
     // Move p-1 after p-2 - 保持相同的 key，只改變 y 值讓動畫生效
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 240, highlight: true, mounting: false }, // y 從 80 變為 240
-      { key: "p-3", oldIndex: 1, y: 80, highlight: false, mounting: false }, // y 從 160 變為 80
-      { key: "p-2", oldIndex: -1, y: 160, highlight: false, mounting: false }, // y 從 240 變為 160
-    ];
-    oldHighlight[0] = true;
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 240, highlight: true, mounting: false }, // y 從 80 變為 240
+      { key: 'p-3', oldIndex: 1, y: 80, highlight: false, mounting: false }, // y 從 160 變為 80
+      { key: 'p-2', oldIndex: -1, y: 160, highlight: false, mounting: false }, // y 從 240 變為 160
+    ]
+    oldHighlight[0] = true
     connection = {
       fromY: 240 + 40,
       toY: 0 + 40,
       show: true,
-    };
-    lastIndex = 1;
-    message = "移動完成：DOM 順序變為 [p-4, p-3, p-2, p-1]";
+    }
+    lastIndex = 1
+    message = '移動完成：DOM 順序變為 [p-4, p-3, p-2, p-1]'
   }
 
   if (clicks >= 18) {
     // Final state
-    newHighlight[3] = false;
-    oldHighlight[0] = false;
-    connection.show = false;
+    newHighlight[3] = false
+    oldHighlight[0] = false
+    connection.show = false
     domNodes = [
-      { key: "p-4", oldIndex: -1, y: 0, highlight: false, mounting: false },
-      { key: "p-3", oldIndex: 1, y: 80, highlight: false, mounting: false },
-      { key: "p-2", oldIndex: -1, y: 160, highlight: false, mounting: false },
-      { key: "p-1", oldIndex: 0, y: 240, highlight: false, mounting: false },
-    ];
-    lastIndex = 1;
-    message = "✓ 更新完成！最終順序 [p-4, p-3, p-2, p-1]";
+      { key: 'p-4', oldIndex: -1, y: 0, highlight: false, mounting: false },
+      { key: 'p-3', oldIndex: 1, y: 80, highlight: false, mounting: false },
+      { key: 'p-2', oldIndex: -1, y: 160, highlight: false, mounting: false },
+      { key: 'p-1', oldIndex: 0, y: 240, highlight: false, mounting: false },
+    ]
+    lastIndex = 1
+    message = '✓ 更新完成！最終順序 [p-4, p-3, p-2, p-1]'
   }
 
   // Apply highlight states to DOM nodes
   domNodes = domNodes.map((node, idx) => ({
     ...node,
     highlight: node.highlight || domHighlight[idx] || false,
-  }));
+  }))
 
   return {
     newChildren: newChildren.map((node, idx) => ({
@@ -299,8 +299,8 @@ const currentState = computed(() => {
     lastIndex,
     message,
     connection,
-  };
-});
+  }
+})
 </script>
 
 <template>
@@ -315,7 +315,9 @@ const currentState = computed(() => {
               <div i-carbon:document-add text-sm />
               <span>新子節點</span>
             </div>
-            <div class="layer-subtitle">(newChildren)</div>
+            <div class="layer-subtitle">
+              (newChildren)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -350,7 +352,9 @@ const currentState = computed(() => {
             <div class="layer-title opacity-0">
               <span>連線</span>
             </div>
-            <div class="layer-subtitle opacity-0">-</div>
+            <div class="layer-subtitle opacity-0">
+              -
+            </div>
             <svg
               width="100%"
               height="320"
@@ -389,7 +393,9 @@ const currentState = computed(() => {
               <div i-carbon:document text-sm />
               <span>舊子節點</span>
             </div>
-            <div class="layer-subtitle">(oldChildren)</div>
+            <div class="layer-subtitle">
+              (oldChildren)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -422,7 +428,9 @@ const currentState = computed(() => {
               <div i-carbon:html text-sm />
               <span>真實 DOM</span>
             </div>
-            <div class="layer-subtitle">(會移動/新增)</div>
+            <div class="layer-subtitle">
+              (會移動/新增)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -479,12 +487,18 @@ const currentState = computed(() => {
 
           <!-- Badge -->
           <div class="badge-container">
-            <div class="badge">lastIndex: {{ currentState.lastIndex }}</div>
+            <div class="badge">
+              lastIndex: {{ currentState.lastIndex }}
+            </div>
           </div>
 
           <!-- Hint -->
-          <div class="hint">點擊或按空格鍵查看下一步</div>
-          <div class="hint-progress">({{ clicks }}/18)</div>
+          <div class="hint">
+            點擊或按空格鍵查看下一步
+          </div>
+          <div class="hint-progress">
+            ({{ clicks }}/18)
+          </div>
         </div>
       </div>
     </div>

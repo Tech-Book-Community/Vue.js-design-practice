@@ -127,8 +127,8 @@ const currentState = computed(() => {
     // Keep array order unchanged, only change y coordinates to trigger animation
     domNodes = [
       { key: 'p-1', oldIndex: 0, y: 160, highlight: true }, // move to position 2
-      { key: 'p-2', oldIndex: 1, y: 0, highlight: false },   // move to position 0
-      { key: 'p-3', oldIndex: 2, y: 80, highlight: false },  // move to position 1
+      { key: 'p-2', oldIndex: 1, y: 0, highlight: false }, // move to position 0
+      { key: 'p-3', oldIndex: 2, y: 80, highlight: false }, // move to position 1
     ]
     oldHighlight[0] = true
     connection = {
@@ -189,7 +189,7 @@ const currentState = computed(() => {
     // Keep array order unchanged, only change y coordinates to trigger animation
     domNodes = [
       { key: 'p-2', oldIndex: 1, y: 160, highlight: true }, // move to position 2
-      { key: 'p-3', oldIndex: 2, y: 0, highlight: false },  // move to position 0
+      { key: 'p-3', oldIndex: 2, y: 0, highlight: false }, // move to position 0
       { key: 'p-1', oldIndex: 0, y: 80, highlight: false }, // move to position 1
     ]
     oldHighlight[1] = true

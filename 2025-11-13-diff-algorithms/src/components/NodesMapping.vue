@@ -1,79 +1,66 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed } from 'vue'
 
 interface MappingRow {
-  newNode?: string; // 可選，為空表示該位置沒有新節點（removed）
-  oldNode?: string; // 可選，為空表示該位置沒有舊節點（added）
-  index: number;
-  targetIndex?: number; // 箭頭要連到哪個舊節點的位置（如果不提供則使用 index）
+  newNode?: string // 可選，為空表示該位置沒有新節點（removed）
+  oldNode?: string // 可選，為空表示該位置沒有舊節點（added）
+  index: number
+  targetIndex?: number // 箭頭要連到哪個舊節點的位置（如果不提供則使用 index）
 }
 
-type NodeStatus = "normal" | "added" | "removed";
+type NodeStatus = 'normal' | 'added' | 'removed'
 
 interface Props {
-  rows: MappingRow[];
-  title?: string;
-  description?: string;
+  rows: MappingRow[]
+  title?: string
+  description?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: "",
-  description: "",
-});
+  title: '',
+  description: '',
+})
 
 // 自動推導節點狀態
-const getStatus = (row: MappingRow): NodeStatus => {
-  if (!row.oldNode) return "added";
-  if (!row.newNode) return "removed";
-  return "normal";
-};
+function getStatus(row: MappingRow): NodeStatus {
+  if (!row.oldNode)
+    return 'added'
+  if (!row.newNode)
+    return 'removed'
+  return 'normal'
+}
 
 // 檢測是否有交叉連接（只檢查 normal 狀態的節點）
 const hasCrossing = computed(() => {
-  const normalRows = props.rows.filter((row) => getStatus(row) === "normal");
+  const normalRows = props.rows.filter(row => getStatus(row) === 'normal')
 
   for (let i = 0; i < normalRows.length; i++) {
     for (let j = i + 1; j < normalRows.length; j++) {
-      const row1 = normalRows[i];
-      const row2 = normalRows[j];
+      const row1 = normalRows[i]
+      const row2 = normalRows[j]
 
       // 提取節點編號進行比較
-      const newNode1 = parseInt(row1.newNode!.split("-")[1]);
-      const newNode2 = parseInt(row2.newNode!.split("-")[1]);
-      const oldNode1 = parseInt(row1.oldNode!.split("-")[1]);
-      const oldNode2 = parseInt(row2.oldNode!.split("-")[1]);
+      const newNode1 = Number.parseInt(row1.newNode!.split('-')[1])
+      const newNode2 = Number.parseInt(row2.newNode!.split('-')[1])
+      const oldNode1 = Number.parseInt(row1.oldNode!.split('-')[1])
+      const oldNode2 = Number.parseInt(row2.oldNode!.split('-')[1])
 
       // 檢測交叉：如果新節點順序和舊節點順序相反
       if (
-        (newNode1 < newNode2 && oldNode1 > oldNode2) ||
-        (newNode1 > newNode2 && oldNode1 < oldNode2)
+        (newNode1 < newNode2 && oldNode1 > oldNode2)
+        || (newNode1 > newNode2 && oldNode1 < oldNode2)
       ) {
-        return true;
+        return true
       }
     }
   }
-  return false;
-});
+  return false
+})
 
 // 獲取目標索引（優先使用 targetIndex，否則使用 index）
-const getTargetIndex = (row: MappingRow) => {
-  return row.targetIndex !== undefined ? row.targetIndex : row.index;
-};
-
-// 計算 SVG 直線路徑（改用直線，更簡單可靠）
-const getPathData = (fromIndex: number, toIndex: number) => {
-  const fromY = fromIndex * 88 + 32;
-  const toY = toIndex * 88 + 32;
-
-  // 統一使用直線
-  return `M 80 ${fromY} L 400 ${toY}`;
-};
-
-// 計算箭頭位置
-const getArrowPoints = (toIndex: number) => {
-  const y = toIndex * 88 + 32;
-  return `400,${y - 4} 410,${y} 400,${y + 4}`;
-};
+function getTargetIndex(row: MappingRow) {
+  return row.targetIndex !== undefined ? row.targetIndex : row.index
+}
 </script>
 
 <template>
@@ -82,10 +69,16 @@ const getArrowPoints = (toIndex: number) => {
     <div v-if="!hasCrossing" class="relative max-w-3xl mx-auto">
       <!-- 標題 -->
       <div class="flex items-center mb-4 text-xs font-bold">
-        <div class="w-32 text-center whitespace-nowrap">新子節點</div>
-        <div class="flex-1"></div>
-        <div class="w-32 text-center whitespace-nowrap">舊子節點</div>
-        <div class="w-20 text-center whitespace-nowrap ml-4">索引</div>
+        <div class="w-32 text-center whitespace-nowrap">
+          新子節點
+        </div>
+        <div class="flex-1" />
+        <div class="w-32 text-center whitespace-nowrap">
+          舊子節點
+        </div>
+        <div class="w-20 text-center whitespace-nowrap ml-4">
+          索引
+        </div>
       </div>
 
       <!-- 動態生成每一行 -->
@@ -107,7 +100,7 @@ const getArrowPoints = (toIndex: number) => {
             }}</span>
           </div>
           <!-- 空白占位（removed 狀態沒有新節點） -->
-          <div v-else class="w-12 h-12 flex-shrink-0"></div>
+          <div v-else class="w-12 h-12 flex-shrink-0" />
         </div>
 
         <!-- 箭頭（只有 normal 狀態才顯示） -->
@@ -128,7 +121,7 @@ const getArrowPoints = (toIndex: number) => {
             <polygon points="84,0 96,4 84,8" fill="currentColor" />
           </svg>
           <!-- 空白占位 -->
-          <div v-else class="w-24 h-2"></div>
+          <div v-else class="w-24 h-2" />
         </div>
 
         <!-- 矩形：舊子節點 -->
@@ -147,15 +140,16 @@ const getArrowPoints = (toIndex: number) => {
               :class="
                 getStatus(row) === 'removed' ? 'text-red-300' : 'text-white'
               "
-              >{{ row.oldNode }}</span
-            >
+            >{{ row.oldNode }}</span>
           </div>
           <!-- 空白占位（added 狀態沒有舊節點） -->
-          <div v-else class="w-24 h-12 flex-shrink-0"></div>
+          <div v-else class="w-24 h-12 flex-shrink-0" />
         </div>
 
         <!-- 索引 -->
-        <div class="w-20 text-center text-sm ml-4">索引 {{ row.index }}</div>
+        <div class="w-20 text-center text-sm ml-4">
+          索引 {{ row.index }}
+        </div>
       </div>
     </div>
 
@@ -163,10 +157,16 @@ const getArrowPoints = (toIndex: number) => {
     <div v-else class="relative max-w-3xl mx-auto">
       <!-- 標題 -->
       <div class="flex items-center mb-4 text-xs font-bold">
-        <div class="w-32 text-center whitespace-nowrap">新子節點</div>
-        <div class="flex-1"></div>
-        <div class="w-32 text-center whitespace-nowrap">舊子節點</div>
-        <div class="w-20 text-center whitespace-nowrap ml-4">索引</div>
+        <div class="w-32 text-center whitespace-nowrap">
+          新子節點
+        </div>
+        <div class="flex-1" />
+        <div class="w-32 text-center whitespace-nowrap">
+          舊子節點
+        </div>
+        <div class="w-20 text-center whitespace-nowrap ml-4">
+          索引
+        </div>
       </div>
 
       <!-- SVG 容器用於繪製曲線 -->
@@ -174,10 +174,15 @@ const getArrowPoints = (toIndex: number) => {
         <!-- SVG 曲線（只畫 normal 狀態的連接線） -->
         <svg
           class="absolute"
-          :style="`left: 72px; top: 0; width: calc(100% - 224px); height: 100%;`"
+          style="
+            left: 72px;
+            top: 0;
+            width: calc(100% - 224px);
+            height: 100%;
+            pointer-events: none;
+          "
           :viewBox="`0 0 320 ${rows.length * 88}`"
           preserveAspectRatio="none"
-          style="pointer-events: none"
         >
           <g v-for="(row, fromIndex) in rows" :key="fromIndex">
             <template v-if="getStatus(row) === 'normal'">
@@ -218,7 +223,7 @@ const getArrowPoints = (toIndex: number) => {
               }}</span>
             </div>
             <!-- 空白占位 -->
-            <div v-else class="w-12 h-12"></div>
+            <div v-else class="w-12 h-12" />
           </div>
         </div>
 
@@ -244,11 +249,10 @@ const getArrowPoints = (toIndex: number) => {
                 :class="
                   getStatus(row) === 'removed' ? 'text-red-300' : 'text-white'
                 "
-                >{{ row.oldNode }}</span
-              >
+              >{{ row.oldNode }}</span>
             </div>
             <!-- 空白占位 -->
-            <div v-else class="w-24 h-12"></div>
+            <div v-else class="w-24 h-12" />
           </div>
         </div>
 
@@ -266,7 +270,9 @@ const getArrowPoints = (toIndex: number) => {
 
     <!-- 圖片標題和說明 -->
     <div class="text-center mt-6">
-      <div v-if="title" class="text-sm text-gray-400 mb-1">{{ title }}</div>
+      <div v-if="title" class="text-sm text-gray-400 mb-1">
+        {{ title }}
+      </div>
       <div v-if="description" class="text-xs text-gray-400">
         {{ description }}
       </div>
