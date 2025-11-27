@@ -61,3 +61,21 @@ src: ./pages/10-1.md
 ---
 src: ./pages/10-3.md
 ---
+
+---
+src: ./pages/10-4.md
+---
+
+---
+src: ./pages/10-5.md
+---
+
+---
+layout: center
+---
+
+# Thank You!
+
+<div class="mt-8 text-2xl text-gray-400">
+Questions?
+</div>
