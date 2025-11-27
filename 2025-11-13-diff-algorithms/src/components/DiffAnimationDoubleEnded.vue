@@ -1,299 +1,303 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed } from 'vue'
 
 const props = defineProps<{
-  clicks: number;
-}>();
+  clicks: number
+}>()
 
 interface Node {
-  key: string;
-  y: number;
-  highlight: boolean;
+  key: string
+  y: number
+  highlight: boolean
 }
 
 // 舊：[p-1, p-2, p-3, p-4]
 // 新：[p-4, p-2, p-1, p-3]
 
 const oldChildren = [
-  { key: "p-1", index: 0, y: 0 },
-  { key: "p-2", index: 1, y: 80 },
-  { key: "p-3", index: 2, y: 160 },
-  { key: "p-4", index: 3, y: 240 },
-];
+  { key: 'p-1', index: 0, y: 0 },
+  { key: 'p-2', index: 1, y: 80 },
+  { key: 'p-3', index: 2, y: 160 },
+  { key: 'p-4', index: 3, y: 240 },
+]
 
 const newChildren = [
-  { key: "p-4", index: 0, y: 0 },
-  { key: "p-2", index: 1, y: 80 },
-  { key: "p-1", index: 2, y: 160 },
-  { key: "p-3", index: 3, y: 240 },
-];
+  { key: 'p-4', index: 0, y: 0 },
+  { key: 'p-2', index: 1, y: 80 },
+  { key: 'p-1', index: 2, y: 160 },
+  { key: 'p-3', index: 3, y: 240 },
+]
 
 const currentState = computed(() => {
-  const clicks = props.clicks;
+  const clicks = props.clicks
 
-  let oldStartIdx = 0;
-  let oldEndIdx = 3;
-  let newStartIdx = 0;
-  let newEndIdx = 3;
+  let oldStartIdx = 0
+  let oldEndIdx = 3
+  let newStartIdx = 0
+  let newEndIdx = 3
 
   // 用於顯示灰色的 index（延後一個 click 更新，讓移動動畫完成後再變灰）
-  let displayOldStartIdx = 0;
-  let displayOldEndIdx = 3;
-  let displayNewStartIdx = 0;
-  let displayNewEndIdx = 3;
+  let displayOldStartIdx = 0
+  let displayOldEndIdx = 3
+  let displayNewStartIdx = 0
+  let displayNewEndIdx = 3
 
   // 保持陣列順序一致，只改變 y 值來實現平滑動畫
   // 初始 DOM: [p-1, p-2, p-3, p-4] -> y: [0, 80, 160, 240]
   let domNodes: Node[] = [
-    { key: "p-1", y: 0, highlight: false },
-    { key: "p-2", y: 80, highlight: false },
-    { key: "p-3", y: 160, highlight: false },
-    { key: "p-4", y: 240, highlight: false },
-  ];
+    { key: 'p-1', y: 0, highlight: false },
+    { key: 'p-2', y: 80, highlight: false },
+    { key: 'p-3', y: 160, highlight: false },
+    { key: 'p-4', y: 240, highlight: false },
+  ]
 
-  let message = "初始狀態：DOM [p-1, p-2, p-3, p-4]";
-  let step = "初始狀態";
-  let comparing: string[] = [];
+  let message = '初始狀態：DOM [p-1, p-2, p-3, p-4]'
+  let step = '初始狀態'
+  let comparing: string[] = []
   let connection = {
     fromY: 0,
     toY: 0,
-    type: "start" as "start" | "end" | "match",
+    type: 'start' as 'start' | 'end' | 'match',
     show: false,
-  };
+  }
 
   // ===== 第一輪：找到 oldEnd(p-4) = newStart(p-4) =====
   if (clicks >= 1) {
-    step = "第一輪";
-    comparing = ["newStart", "oldStart"];
-    connection = { fromY: 0 + 40, toY: 0 + 40, type: "start", show: true };
-    message = "①：newStart(p-4) vs oldStart(p-1) ❌";
+    step = '第一輪'
+    comparing = ['newStart', 'oldStart']
+    connection = { fromY: 0 + 40, toY: 0 + 40, type: 'start', show: true }
+    message = '①：newStart(p-4) vs oldStart(p-1) ❌'
   }
 
   if (clicks >= 2) {
-    comparing = ["newEnd", "oldEnd"];
-    connection = { fromY: 240 + 40, toY: 240 + 40, type: "end", show: true };
-    message = "②：newEnd(p-3) vs oldEnd(p-4) ❌";
+    comparing = ['newEnd', 'oldEnd']
+    connection = { fromY: 240 + 40, toY: 240 + 40, type: 'end', show: true }
+    message = '②：newEnd(p-3) vs oldEnd(p-4) ❌'
   }
 
   if (clicks >= 3) {
-    comparing = ["newEnd", "oldStart"];
-    connection = { fromY: 240 + 40, toY: 0 + 40, type: "end", show: true };
-    message = "③：newEnd(p-3) vs oldStart(p-1) ❌";
+    comparing = ['newEnd', 'oldStart']
+    connection = { fromY: 240 + 40, toY: 0 + 40, type: 'end', show: true }
+    message = '③：newEnd(p-3) vs oldStart(p-1) ❌'
   }
 
   if (clicks >= 4) {
-    comparing = ["newStart", "oldEnd"];
-    connection = { fromY: 0 + 40, toY: 240 + 40, type: "match", show: true };
+    comparing = ['newStart', 'oldEnd']
+    connection = { fromY: 0 + 40, toY: 240 + 40, type: 'match', show: true }
     // 配對成功，先 highlight p-4
     domNodes = [
-      { key: "p-1", y: 0, highlight: false },
-      { key: "p-2", y: 80, highlight: false },
-      { key: "p-3", y: 160, highlight: false },
-      { key: "p-4", y: 240, highlight: true },
-    ];
-    message = "④：newStart(p-4) vs oldEnd(p-4) ✅ 命中！";
+      { key: 'p-1', y: 0, highlight: false },
+      { key: 'p-2', y: 80, highlight: false },
+      { key: 'p-3', y: 160, highlight: false },
+      { key: 'p-4', y: 240, highlight: true },
+    ]
+    message = '④：newStart(p-4) vs oldEnd(p-4) ✅ 命中！'
   }
 
   if (clicks >= 5) {
     // DOM: [p-4, p-1, p-2, p-3] -> p-4 移到最前面
     // 保持陣列順序 [p-1, p-2, p-3, p-4]，只改變 y 值
     domNodes = [
-      { key: "p-1", y: 80, highlight: false },
-      { key: "p-2", y: 160, highlight: false },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: true },
-    ];
-    oldEndIdx = 2;
-    newStartIdx = 1;
-    comparing = [];
-    connection.show = false;
-    message = "移動 p-4 到頭部，DOM: [p-4, p-1, p-2, p-3]";
+      { key: 'p-1', y: 80, highlight: false },
+      { key: 'p-2', y: 160, highlight: false },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: true },
+    ]
+    oldEndIdx = 2
+    newStartIdx = 1
+    comparing = []
+    connection.show = false
+    message = '移動 p-4 到頭部，DOM: [p-4, p-1, p-2, p-3]'
   }
 
   // ===== 第二輪 =====
   if (clicks >= 6) {
-    step = "第二輪";
+    step = '第二輪'
     // DOM 仍然是 [p-4, p-1, p-2, p-3]
     domNodes = [
-      { key: "p-1", y: 80, highlight: false },
-      { key: "p-2", y: 160, highlight: false },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    oldEndIdx = 2;
-    newStartIdx = 1;
+      { key: 'p-1', y: 80, highlight: false },
+      { key: 'p-2', y: 160, highlight: false },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    oldEndIdx = 2
+    newStartIdx = 1
     // 進入第二輪時，第一輪處理的節點變灰
-    displayOldEndIdx = 2;
-    displayNewStartIdx = 1;
-    comparing = ["newStart", "oldStart"];
-    connection = { fromY: 80 + 40, toY: 0 + 40, type: "start", show: true };
-    message = "①：newStart(p-2) vs oldStart(p-1) ❌";
+    displayOldEndIdx = 2
+    displayNewStartIdx = 1
+    comparing = ['newStart', 'oldStart']
+    connection = { fromY: 80 + 40, toY: 0 + 40, type: 'start', show: true }
+    message = '①：newStart(p-2) vs oldStart(p-1) ❌'
   }
 
   if (clicks >= 7) {
-    comparing = ["newEnd", "oldEnd"];
-    connection = { fromY: 240 + 40, toY: 160 + 40, type: "match", show: true };
+    comparing = ['newEnd', 'oldEnd']
+    connection = { fromY: 240 + 40, toY: 160 + 40, type: 'match', show: true }
     // 配對成功，先 highlight p-3
     domNodes = [
-      { key: "p-1", y: 80, highlight: false },
-      { key: "p-2", y: 160, highlight: false },
-      { key: "p-3", y: 240, highlight: true },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    message = "②：newEnd(p-3) vs oldEnd(p-3) ✅ 命中！";
+      { key: 'p-1', y: 80, highlight: false },
+      { key: 'p-2', y: 160, highlight: false },
+      { key: 'p-3', y: 240, highlight: true },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    message = '②：newEnd(p-3) vs oldEnd(p-3) ✅ 命中！'
   }
 
   if (clicks >= 8) {
     // DOM 仍然是 [p-4, p-1, p-2, p-3]，p-3 不移動只 patch
     domNodes = [
-      { key: "p-1", y: 80, highlight: false },
-      { key: "p-2", y: 160, highlight: false },
-      { key: "p-3", y: 240, highlight: true },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    oldEndIdx = 1;
-    newEndIdx = 2;
-    comparing = [];
-    connection.show = false;
-    message = "尾尾相同，不移動，只 patch";
+      { key: 'p-1', y: 80, highlight: false },
+      { key: 'p-2', y: 160, highlight: false },
+      { key: 'p-3', y: 240, highlight: true },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    oldEndIdx = 1
+    newEndIdx = 2
+    comparing = []
+    connection.show = false
+    message = '尾尾相同，不移動，只 patch'
   }
 
   // ===== 第三輪 =====
   if (clicks >= 9) {
-    step = "第三輪";
+    step = '第三輪'
     // DOM 仍然是 [p-4, p-1, p-2, p-3]
     domNodes = [
-      { key: "p-1", y: 80, highlight: false },
-      { key: "p-2", y: 160, highlight: false },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    oldEndIdx = 1;
-    newEndIdx = 2;
+      { key: 'p-1', y: 80, highlight: false },
+      { key: 'p-2', y: 160, highlight: false },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    oldEndIdx = 1
+    newEndIdx = 2
     // 進入第三輪時，第二輪處理的節點變灰
-    displayOldEndIdx = 1;
-    displayNewEndIdx = 2;
-    comparing = ["newStart", "oldStart"];
+    displayOldEndIdx = 1
+    displayNewEndIdx = 2
+    comparing = ['newStart', 'oldStart']
     // newStart(p-2) at y=80, oldStart(p-1) at y=0
-    connection = { fromY: 80 + 40, toY: 0 + 40, type: "start", show: true };
-    message = "①：newStart(p-2) vs oldStart(p-1) ❌";
+    connection = { fromY: 80 + 40, toY: 0 + 40, type: 'start', show: true }
+    message = '①：newStart(p-2) vs oldStart(p-1) ❌'
   }
 
   if (clicks >= 10) {
-    comparing = ["newEnd", "oldEnd"];
+    comparing = ['newEnd', 'oldEnd']
     // newEnd(p-1) at y=160, oldEnd(p-2) at y=80
-    connection = { fromY: 160 + 40, toY: 80 + 40, type: "end", show: true };
-    message = "②：newEnd(p-1) vs oldEnd(p-2) ❌";
+    connection = { fromY: 160 + 40, toY: 80 + 40, type: 'end', show: true }
+    message = '②：newEnd(p-1) vs oldEnd(p-2) ❌'
   }
 
   if (clicks >= 11) {
-    comparing = ["newEnd", "oldStart"];
+    comparing = ['newEnd', 'oldStart']
     // newEnd(p-1) at y=160, oldStart(p-1) at y=0
-    connection = { fromY: 160 + 40, toY: 0 + 40, type: "match", show: true };
+    connection = { fromY: 160 + 40, toY: 0 + 40, type: 'match', show: true }
     // 配對成功，先 highlight p-1
     domNodes = [
-      { key: "p-1", y: 80, highlight: true },
-      { key: "p-2", y: 160, highlight: false },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    message = "③：newEnd(p-1) vs oldStart(p-1) ✅ 命中！";
+      { key: 'p-1', y: 80, highlight: true },
+      { key: 'p-2', y: 160, highlight: false },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    message = '③：newEnd(p-1) vs oldStart(p-1) ✅ 命中！'
   }
 
   if (clicks >= 12) {
     // DOM: [p-4, p-2, p-1, p-3] -> p-1 移到 p-3 前面
     domNodes = [
-      { key: "p-1", y: 160, highlight: true },
-      { key: "p-2", y: 80, highlight: false },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    oldStartIdx = 1;
-    newEndIdx = 1;
-    comparing = [];
-    connection.show = false;
-    message = "移動 p-1 到尾部，DOM: [p-4, p-2, p-1, p-3]";
+      { key: 'p-1', y: 160, highlight: true },
+      { key: 'p-2', y: 80, highlight: false },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    oldStartIdx = 1
+    newEndIdx = 1
+    comparing = []
+    connection.show = false
+    message = '移動 p-1 到尾部，DOM: [p-4, p-2, p-1, p-3]'
   }
 
   // ===== 第四輪 =====
   if (clicks >= 13) {
-    step = "第四輪";
+    step = '第四輪'
     // DOM 仍然是 [p-4, p-2, p-1, p-3]
     // 配對成功，先 highlight p-2
     domNodes = [
-      { key: "p-1", y: 160, highlight: false },
-      { key: "p-2", y: 80, highlight: true },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    oldStartIdx = 1;
-    oldEndIdx = 1;
-    newStartIdx = 1;
-    newEndIdx = 1;
+      { key: 'p-1', y: 160, highlight: false },
+      { key: 'p-2', y: 80, highlight: true },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    oldStartIdx = 1
+    oldEndIdx = 1
+    newStartIdx = 1
+    newEndIdx = 1
     // 進入第四輪時，第三輪處理的節點變灰
-    displayOldStartIdx = 1;
-    displayNewEndIdx = 1;
-    comparing = ["newStart", "oldStart"];
-    connection = { fromY: 80 + 40, toY: 80 + 40, type: "match", show: true };
-    message = "①：newStart(p-2) vs oldStart(p-2) ✅ 命中！";
+    displayOldStartIdx = 1
+    displayNewEndIdx = 1
+    comparing = ['newStart', 'oldStart']
+    connection = { fromY: 80 + 40, toY: 80 + 40, type: 'match', show: true }
+    message = '①：newStart(p-2) vs oldStart(p-2) ✅ 命中！'
   }
 
   if (clicks >= 14) {
     // DOM 仍然是 [p-4, p-2, p-1, p-3]，p-2 不移動只 patch
     domNodes = [
-      { key: "p-1", y: 160, highlight: false },
-      { key: "p-2", y: 80, highlight: true },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
-    oldStartIdx = 2;
-    oldEndIdx = 1;
-    newStartIdx = 2;
-    newEndIdx = 1;
-    comparing = [];
-    connection.show = false;
-    message = "頭頭相同，不移動，只 patch";
+      { key: 'p-1', y: 160, highlight: false },
+      { key: 'p-2', y: 80, highlight: true },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
+    oldStartIdx = 2
+    oldEndIdx = 1
+    newStartIdx = 2
+    newEndIdx = 1
+    comparing = []
+    connection.show = false
+    message = '頭頭相同，不移動，只 patch'
   }
 
   // ===== 完成 =====
   if (clicks >= 15) {
-    step = "完成";
+    step = '完成'
     // 最終 DOM: [p-4, p-2, p-1, p-3]
     domNodes = [
-      { key: "p-1", y: 160, highlight: false },
-      { key: "p-2", y: 80, highlight: false },
-      { key: "p-3", y: 240, highlight: false },
-      { key: "p-4", y: 0, highlight: false },
-    ];
+      { key: 'p-1', y: 160, highlight: false },
+      { key: 'p-2', y: 80, highlight: false },
+      { key: 'p-3', y: 240, highlight: false },
+      { key: 'p-4', y: 0, highlight: false },
+    ]
     // 完成時，所有節點都變灰
-    displayOldStartIdx = 2;
-    displayOldEndIdx = 1;
-    displayNewStartIdx = 2;
-    displayNewEndIdx = 1;
-    message = "✓ 完成！共 2 次移動（簡單 Diff 需要 3 次）";
+    displayOldStartIdx = 2
+    displayOldEndIdx = 1
+    displayNewStartIdx = 2
+    displayNewEndIdx = 1
+    message = '✓ 完成！共 2 次移動（簡單 Diff 需要 3 次）'
   }
 
   const getOldHighlight = (idx: number) => {
-    if (comparing.includes("oldStart") && idx === oldStartIdx) return "start";
-    if (comparing.includes("oldEnd") && idx === oldEndIdx) return "end";
-    return "";
-  };
+    if (comparing.includes('oldStart') && idx === oldStartIdx)
+      return 'start'
+    if (comparing.includes('oldEnd') && idx === oldEndIdx)
+      return 'end'
+    return ''
+  }
 
   const getNewHighlight = (idx: number) => {
-    if (comparing.includes("newStart") && idx === newStartIdx) return "start";
-    if (comparing.includes("newEnd") && idx === newEndIdx) return "end";
-    return "";
-  };
+    if (comparing.includes('newStart') && idx === newStartIdx)
+      return 'start'
+    if (comparing.includes('newEnd') && idx === newEndIdx)
+      return 'end'
+    return ''
+  }
 
   // 判斷節點是否已處理完成（在索引範圍外）
   // 使用 display* 變數，讓變灰效果延後一個 click
   const isOldProcessed = (idx: number) => {
-    return idx < displayOldStartIdx || idx > displayOldEndIdx;
-  };
+    return idx < displayOldStartIdx || idx > displayOldEndIdx
+  }
 
   const isNewProcessed = (idx: number) => {
-    return idx < displayNewStartIdx || idx > displayNewEndIdx;
-  };
+    return idx < displayNewStartIdx || idx > displayNewEndIdx
+  }
 
   return {
     oldChildren: oldChildren.map((node, idx) => ({
@@ -315,8 +319,8 @@ const currentState = computed(() => {
     step,
     comparing,
     connection,
-  };
-});
+  }
+})
 </script>
 
 <template>
@@ -330,7 +334,9 @@ const currentState = computed(() => {
               <div class="i-carbon:document-add text-sm" />
               <span>新子節點</span>
             </div>
-            <div class="layer-subtitle">(newChildren)</div>
+            <div class="layer-subtitle">
+              (newChildren)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -350,7 +356,7 @@ const currentState = computed(() => {
                   :class="{
                     'highlight-start': node.highlightType === 'start',
                     'highlight-end': node.highlightType === 'end',
-                    processed: node.processed,
+                    'processed': node.processed,
                   }"
                   rx="6"
                 />
@@ -368,8 +374,12 @@ const currentState = computed(() => {
 
           <!-- Connection area -->
           <div class="connection-column">
-            <div class="layer-title opacity-0"><span>連線</span></div>
-            <div class="layer-subtitle opacity-0">-</div>
+            <div class="layer-title opacity-0">
+              <span>連線</span>
+            </div>
+            <div class="layer-subtitle opacity-0">
+              -
+            </div>
             <svg
               width="100%"
               height="320"
@@ -423,7 +433,9 @@ const currentState = computed(() => {
               <div class="i-carbon:document text-sm" />
               <span>舊子節點</span>
             </div>
-            <div class="layer-subtitle">(oldChildren)</div>
+            <div class="layer-subtitle">
+              (oldChildren)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -443,7 +455,7 @@ const currentState = computed(() => {
                   :class="{
                     'highlight-start': node.highlightType === 'start',
                     'highlight-end': node.highlightType === 'end',
-                    processed: node.processed,
+                    'processed': node.processed,
                   }"
                   rx="6"
                 />
@@ -465,7 +477,9 @@ const currentState = computed(() => {
               <div class="i-carbon:html text-sm" />
               <span>真實 DOM</span>
             </div>
-            <div class="layer-subtitle">(會移動)</div>
+            <div class="layer-subtitle">
+              (會移動)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -500,7 +514,9 @@ const currentState = computed(() => {
           </div>
 
           <div class="compare-box">
-            <div class="compare-title">當前比較</div>
+            <div class="compare-title">
+              當前比較
+            </div>
             <div class="compare-items">
               <template v-if="currentState.comparing.length > 0">
                 <span
@@ -521,33 +537,31 @@ const currentState = computed(() => {
 
           <div class="message-box">
             <div class="message-content">
-              <div class="text-sm">{{ currentState.message }}</div>
+              <div class="text-sm">
+                {{ currentState.message }}
+              </div>
             </div>
           </div>
 
           <div class="index-display">
             <div class="index-row">
               <span class="index-label">old:</span>
-              <span class="index-value start"
-                >S={{ currentState.oldStartIdx }}</span
-              >
-              <span class="index-value end"
-                >E={{ currentState.oldEndIdx }}</span
-              >
+              <span class="index-value start">S={{ currentState.oldStartIdx }}</span>
+              <span class="index-value end">E={{ currentState.oldEndIdx }}</span>
             </div>
             <div class="index-row">
               <span class="index-label">new:</span>
-              <span class="index-value start"
-                >S={{ currentState.newStartIdx }}</span
-              >
-              <span class="index-value end"
-                >E={{ currentState.newEndIdx }}</span
-              >
+              <span class="index-value start">S={{ currentState.newStartIdx }}</span>
+              <span class="index-value end">E={{ currentState.newEndIdx }}</span>
             </div>
           </div>
 
-          <div class="hint">點擊或按空格鍵查看下一步</div>
-          <div class="hint-progress">({{ clicks }}/15)</div>
+          <div class="hint">
+            點擊或按空格鍵查看下一步
+          </div>
+          <div class="hint-progress">
+            ({{ clicks }}/15)
+          </div>
         </div>
       </div>
     </div>
