@@ -1,127 +1,127 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed } from 'vue'
 
 // Track current click step using Slidev's $clicks
 const props = defineProps<{
-  clicks: number;
-}>();
+  clicks: number
+}>()
 
 // Node data structure
 interface Node {
-  key: string;
-  oldIndex: number;
-  y: number;
-  highlight: boolean;
-  removing?: boolean;
+  key: string
+  oldIndex: number
+  y: number
+  highlight: boolean
+  removing?: boolean
 }
 
 // Connection data structure
 interface Connection {
-  fromY: number;
-  toY: number;
-  show: boolean;
+  fromY: number
+  toY: number
+  show: boolean
 }
 
 // Old children - 有 4 個節點
 const oldChildren = [
-  { key: "p-1", index: 0, y: 0 },
-  { key: "p-2", index: 1, y: 80 },
-  { key: "p-3", index: 2, y: 160 },
-  { key: "p-4", index: 3, y: 240 },
-];
+  { key: 'p-1', index: 0, y: 0 },
+  { key: 'p-2', index: 1, y: 80 },
+  { key: 'p-3', index: 2, y: 160 },
+  { key: 'p-4', index: 3, y: 240 },
+]
 
 // New children - 只有 2 個節點，p-2 和 p-4 被刪除
 const newChildren = [
-  { key: "p-3", index: 0, y: 0 },
-  { key: "p-1", index: 1, y: 80 },
-];
+  { key: 'p-3', index: 0, y: 0 },
+  { key: 'p-1', index: 1, y: 80 },
+]
 
 // Calculate current state based on clicks
 const currentState = computed(() => {
-  const clicks = props.clicks;
+  const clicks = props.clicks
 
   // Initialize all node highlight states
-  const newHighlight = [false, false];
-  const oldHighlight = [false, false, false, false];
-  const domHighlight = [false, false, false, false];
+  const newHighlight = [false, false]
+  const oldHighlight = [false, false, false, false]
+  const domHighlight = [false, false, false, false]
 
   // Initial DOM order - 4 個節點
   let domNodes: Node[] = [
-    { key: "p-1", oldIndex: 0, y: 0, highlight: false, removing: false },
-    { key: "p-2", oldIndex: 1, y: 80, highlight: false, removing: false },
-    { key: "p-3", oldIndex: 2, y: 160, highlight: false, removing: false },
-    { key: "p-4", oldIndex: 3, y: 240, highlight: false, removing: false },
-  ];
+    { key: 'p-1', oldIndex: 0, y: 0, highlight: false, removing: false },
+    { key: 'p-2', oldIndex: 1, y: 80, highlight: false, removing: false },
+    { key: 'p-3', oldIndex: 2, y: 160, highlight: false, removing: false },
+    { key: 'p-4', oldIndex: 3, y: 240, highlight: false, removing: false },
+  ]
 
-  let lastIndex = 0;
-  let message = "初始狀態：真實 DOM 順序 [p-1, p-2, p-3, p-4]";
-  let connection: Connection = { fromY: 0, toY: 0, show: false };
+  let lastIndex = 0
+  let message = '初始狀態：真實 DOM 順序 [p-1, p-2, p-3, p-4]'
+  let connection: Connection = { fromY: 0, toY: 0, show: false }
 
   // Click 0: Initial state (already set)
 
   if (clicks >= 1) {
     // Click 1: Process p-3 - highlight new node
-    newHighlight[0] = true;
-    message = "步驟 1：處理新 children[0] = p-3";
+    newHighlight[0] = true
+    message = '步驟 1：處理新 children[0] = p-3'
   }
 
   if (clicks >= 2) {
     // Click 2: Find p-3 in old children, show connection
-    oldHighlight[2] = true; // p-3 is at old children index 2
-    domHighlight[2] = true; // p-3 is at DOM index 2
+    oldHighlight[2] = true // p-3 is at old children index 2
+    domHighlight[2] = true // p-3 is at DOM index 2
     connection = {
       fromY: 0 + 40, // new node p-3's y
       toY: 160 + 40, // old node p-3's y
       show: true,
-    };
-    message = "找到 p-3 在舊 children 的索引 = 2";
+    }
+    message = '找到 p-3 在舊 children 的索引 = 2'
   }
 
   if (clicks >= 3) {
     // Click 3: Determine no move needed
-    message = "索引 2 >= lastIndex 0，不需要移動";
+    message = '索引 2 >= lastIndex 0，不需要移動'
   }
 
   if (clicks >= 4) {
     // Click 4: Update lastIndex
-    lastIndex = 2;
-    message = "lastIndex 更新為 2，p-3 保持在原位置";
+    lastIndex = 2
+    message = 'lastIndex 更新為 2，p-3 保持在原位置'
   }
 
   if (clicks >= 5) {
     // Click 5: Clear highlights, prepare for next node
-    newHighlight[0] = false;
-    oldHighlight[2] = false;
-    domHighlight[2] = false;
-    connection.show = false;
-    newHighlight[1] = true; // Highlight new node p-1
-    lastIndex = 2;
-    message = "步驟 2：處理新 children[1] = p-1";
+    newHighlight[0] = false
+    oldHighlight[2] = false
+    domHighlight[2] = false
+    connection.show = false
+    newHighlight[1] = true // Highlight new node p-1
+    lastIndex = 2
+    message = '步驟 2：處理新 children[1] = p-1'
   }
 
   if (clicks >= 6) {
     // Click 6: Find p-1, show connection and highlight
-    oldHighlight[0] = true; // p-1 is at old children index 0
-    domHighlight[0] = true; // p-1 is at current DOM index 0
+    oldHighlight[0] = true // p-1 is at old children index 0
+    domHighlight[0] = true // p-1 is at current DOM index 0
     connection = {
       fromY: 80 + 40, // new node p-1's y
       toY: 0 + 40, // old node p-1's y
       show: true,
-    };
-    lastIndex = 2;
-    message = "找到 p-1 在舊 children 的索引 = 0";
+    }
+    lastIndex = 2
+    message = '找到 p-1 在舊 children 的索引 = 0'
   }
 
   if (clicks >= 7) {
     // Click 7: Determine move needed
-    lastIndex = 2;
-    message = "索引 0 < lastIndex 2，需要移動！";
+    lastIndex = 2
+    message = '索引 0 < lastIndex 2，需要移動！'
   }
 
   if (clicks >= 8) {
     // Click 8: Explain move target
-    lastIndex = 2;
-    message = "p-1 需要移動到 p-3 後面（prevVNode 是 p-3）";
+    lastIndex = 2
+    message = 'p-1 需要移動到 p-3 後面（prevVNode 是 p-3）'
   }
 
   if (clicks >= 9) {
@@ -129,100 +129,100 @@ const currentState = computed(() => {
     // insert(p-1.el, container, p-3.el.nextSibling) => insert before p-4
     // So DOM order becomes [p-2, p-3, p-1, p-4]
     domNodes = [
-      { key: "p-1", oldIndex: 0, y: 160, highlight: true, removing: false }, // move to position 2 (after p-3, before p-4)
-      { key: "p-2", oldIndex: 1, y: 0, highlight: false, removing: false }, // move to position 0
-      { key: "p-3", oldIndex: 2, y: 80, highlight: false, removing: false }, // move to position 1
-      { key: "p-4", oldIndex: 3, y: 240, highlight: false, removing: false }, // move to position 3
-    ];
-    oldHighlight[0] = true;
+      { key: 'p-1', oldIndex: 0, y: 160, highlight: true, removing: false }, // move to position 2 (after p-3, before p-4)
+      { key: 'p-2', oldIndex: 1, y: 0, highlight: false, removing: false }, // move to position 0
+      { key: 'p-3', oldIndex: 2, y: 80, highlight: false, removing: false }, // move to position 1
+      { key: 'p-4', oldIndex: 3, y: 240, highlight: false, removing: false }, // move to position 3
+    ]
+    oldHighlight[0] = true
     connection = {
       fromY: 80 + 40,
       toY: 0 + 40,
       show: true,
-    };
-    lastIndex = 2;
-    message = "移動完成：真實 DOM 順序變為 [p-2, p-3, p-1, p-4]";
+    }
+    lastIndex = 2
+    message = '移動完成：真實 DOM 順序變為 [p-2, p-3, p-1, p-4]'
   }
 
   if (clicks >= 10) {
     // Click 10: Clear highlights, update complete
-    newHighlight[1] = false;
-    oldHighlight[0] = false;
-    domHighlight[0] = false;
-    connection.show = false;
+    newHighlight[1] = false
+    oldHighlight[0] = false
+    domHighlight[0] = false
+    connection.show = false
     domNodes = [
-      { key: "p-2", oldIndex: 1, y: 0, highlight: false, removing: false },
-      { key: "p-3", oldIndex: 2, y: 80, highlight: false, removing: false },
-      { key: "p-1", oldIndex: 0, y: 160, highlight: false, removing: false },
-      { key: "p-4", oldIndex: 3, y: 240, highlight: false, removing: false },
-    ];
-    lastIndex = 2;
-    message = "✓ 更新階段完成！真實 DOM 順序為 [p-2, p-3, p-1, p-4]";
+      { key: 'p-2', oldIndex: 1, y: 0, highlight: false, removing: false },
+      { key: 'p-3', oldIndex: 2, y: 80, highlight: false, removing: false },
+      { key: 'p-1', oldIndex: 0, y: 160, highlight: false, removing: false },
+      { key: 'p-4', oldIndex: 3, y: 240, highlight: false, removing: false },
+    ]
+    lastIndex = 2
+    message = '✓ 更新階段完成！真實 DOM 順序為 [p-2, p-3, p-1, p-4]'
   }
 
   if (clicks >= 11) {
     // Click 11: Start unmount phase - check p-2
-    oldHighlight[1] = true; // Highlight p-2 in old children
-    domHighlight[0] = true; // Highlight p-2 in DOM
-    message = "卸載階段：檢查舊節點 p-2 是否還在新 children 中";
+    oldHighlight[1] = true // Highlight p-2 in old children
+    domHighlight[0] = true // Highlight p-2 in DOM
+    message = '卸載階段：檢查舊節點 p-2 是否還在新 children 中'
   }
 
   if (clicks >= 12) {
     // Click 12: p-2 not found, mark for removal
-    domNodes = domNodes.map((node) =>
-      node.key === "p-2" ? { ...node, removing: true, highlight: true } : node,
-    );
-    message = "p-2 不在新 children 中，需要卸載（unmount）";
+    domNodes = domNodes.map(node =>
+      node.key === 'p-2' ? { ...node, removing: true, highlight: true } : node,
+    )
+    message = 'p-2 不在新 children 中，需要卸載（unmount）'
   }
 
   if (clicks >= 13) {
     // Click 13: Remove p-2 with animation
-    domNodes = domNodes.filter((node) => node.key !== "p-2");
-    oldHighlight[1] = false;
-    domHighlight[0] = false;
-    message = "p-2 已被移除！真實 DOM 順序變為 [p-3, p-1, p-4]";
+    domNodes = domNodes.filter(node => node.key !== 'p-2')
+    oldHighlight[1] = false
+    domHighlight[0] = false
+    message = 'p-2 已被移除！真實 DOM 順序變為 [p-3, p-1, p-4]'
   }
 
   if (clicks >= 14) {
     // Click 14: Check p-4
-    oldHighlight[3] = true; // Highlight p-4 in old children
+    oldHighlight[3] = true // Highlight p-4 in old children
     // Find p-4 in current DOM (index 1 now after p-2 removed)
-    const p4DomIndex = domNodes.findIndex((n) => n.key === "p-4");
+    const p4DomIndex = domNodes.findIndex(n => n.key === 'p-4')
     if (p4DomIndex >= 0) {
-      domHighlight[p4DomIndex] = true;
+      domHighlight[p4DomIndex] = true
       domNodes = domNodes.map((node, idx) =>
         idx === p4DomIndex ? { ...node, highlight: true } : node,
-      );
+      )
     }
-    message = "檢查舊節點 p-4 是否還在新 children 中";
+    message = '檢查舊節點 p-4 是否還在新 children 中'
   }
 
   if (clicks >= 15) {
     // Click 15: p-4 not found, mark for removal
-    const p4DomIndex = domNodes.findIndex((n) => n.key === "p-4");
+    const p4DomIndex = domNodes.findIndex(n => n.key === 'p-4')
     domNodes = domNodes.map((node, idx) =>
       idx === p4DomIndex ? { ...node, removing: true } : node,
-    );
-    message = "p-4 不在新 children 中，需要卸載（unmount）";
+    )
+    message = 'p-4 不在新 children 中，需要卸載（unmount）'
   }
 
   if (clicks >= 16) {
     // Click 16: Remove p-4 with animation
-    domNodes = domNodes.filter((node) => node.key !== "p-4");
-    oldHighlight[3] = false;
+    domNodes = domNodes.filter(node => node.key !== 'p-4')
+    oldHighlight[3] = false
     // Clear all DOM highlights after removal
-    domHighlight[0] = false;
-    domHighlight[1] = false;
-    domHighlight[2] = false;
-    domHighlight[3] = false;
-    message = "✓ p-4 已被移除！最終 DOM 順序為 [p-3, p-1]";
+    domHighlight[0] = false
+    domHighlight[1] = false
+    domHighlight[2] = false
+    domHighlight[3] = false
+    message = '✓ p-4 已被移除！最終 DOM 順序為 [p-3, p-1]'
   }
 
   // Apply highlight states to DOM nodes
   domNodes = domNodes.map((node, idx) => ({
     ...node,
     highlight: node.highlight || domHighlight[idx] || false,
-  }));
+  }))
 
   return {
     newChildren: newChildren.map((node, idx) => ({
@@ -237,8 +237,8 @@ const currentState = computed(() => {
     lastIndex,
     message,
     connection,
-  };
-});
+  }
+})
 </script>
 
 <template>
@@ -253,7 +253,9 @@ const currentState = computed(() => {
               <div i-carbon:document-add text-sm />
               <span>新子節點</span>
             </div>
-            <div class="layer-subtitle">(newChildren)</div>
+            <div class="layer-subtitle">
+              (newChildren)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -288,7 +290,9 @@ const currentState = computed(() => {
             <div class="layer-title opacity-0">
               <span>連線</span>
             </div>
-            <div class="layer-subtitle opacity-0">-</div>
+            <div class="layer-subtitle opacity-0">
+              -
+            </div>
             <svg
               width="100%"
               height="320"
@@ -327,7 +331,9 @@ const currentState = computed(() => {
               <div i-carbon:document text-sm />
               <span>舊子節點</span>
             </div>
-            <div class="layer-subtitle">(oldChildren)</div>
+            <div class="layer-subtitle">
+              (oldChildren)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -360,7 +366,9 @@ const currentState = computed(() => {
               <div i-carbon:html text-sm />
               <span>真實 DOM</span>
             </div>
-            <div class="layer-subtitle">(會移動/刪除)</div>
+            <div class="layer-subtitle">
+              (會移動/刪除)
+            </div>
             <svg
               width="100%"
               height="320"
@@ -408,12 +416,18 @@ const currentState = computed(() => {
 
           <!-- Badge -->
           <div class="badge-container">
-            <div class="badge">lastIndex: {{ currentState.lastIndex }}</div>
+            <div class="badge">
+              lastIndex: {{ currentState.lastIndex }}
+            </div>
           </div>
 
           <!-- Hint -->
-          <div class="hint">點擊或按空格鍵查看下一步</div>
-          <div class="hint-progress">({{ clicks }}/16)</div>
+          <div class="hint">
+            點擊或按空格鍵查看下一步
+          </div>
+          <div class="hint-progress">
+            ({{ clicks }}/16)
+          </div>
         </div>
       </div>
     </div>
