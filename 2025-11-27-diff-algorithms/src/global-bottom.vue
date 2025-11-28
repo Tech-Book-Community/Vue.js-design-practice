@@ -155,35 +155,37 @@ const poly3 = usePloy(3)
   <div>
     <div
       class="bg transform-gpu overflow-hidden pointer-events-none"
-      :style="{ filter: `blur(70px) hue-rotate(${hue}deg)` }" :class="[
+      :style="{ filter: `blur(70px) hue-rotate(${hue}deg)` }"
+      :class="[
         theme === 'light' ? 'bg-white scale-150' : 'bg-black',
-      ]" aria-hidden="true"
+      ]"
+      aria-hidden="true"
     >
       <template v-if="theme === 'light'">
         <div
-          class="clip bg-gradient-to-r from-[#ed5132] to-[#ed4832]"
+          class="clip bg-gradient-to-r from-[#32aeed] to-[#32e5ed]"
           :style="{ 'clip-path': `polygon(${poly1})`, 'opacity': opacity }"
         />
         <div
-          class="clip bg-gradient-to-l from-[#ed5132] to-[#ed4832]"
+          class="clip bg-gradient-to-l from-[#32aeed] to-[#32e5ed]"
           :style="{ 'clip-path': `polygon(${poly2})`, 'opacity': opacity }"
         />
         <div
-          class="clip bg-gradient-to-t from-[#ed5132] to-[#ed4832]"
+          class="clip bg-gradient-to-t from-[#32aeed] to-[#32e5ed]"
           :style="{ 'clip-path': `polygon(${poly3})`, 'opacity': 0.2 }"
         />
       </template>
       <template v-else>
         <div
-          class="clip bg-gradient-to-r from-[#ed5132] to-[#ed4832]"
+          class="clip bg-gradient-to-r from-[#32aeed] to-[#32e5ed]"
           :style="{ 'clip-path': `polygon(${poly1})`, 'opacity': opacity }"
         />
         <div
-          class="clip bg-gradient-to-l from-[#ed5132] to-[#ed4832]"
+          class="clip bg-gradient-to-l from-[#32aeed] to-[#32e5ed]"
           :style="{ 'clip-path': `polygon(${poly2})`, 'opacity': opacity }"
         />
         <div
-          class="clip bg-gradient-to-t from-[#ed5132] to-[#ed4832]"
+          class="clip bg-gradient-to-t from-[#32aeed] to-[#32e5ed]"
           :style="{ 'clip-path': `polygon(${poly3})`, 'opacity': 0.2 }"
         />
       </template>
