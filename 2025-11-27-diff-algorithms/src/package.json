@@ -1,0 +1,19 @@
+{
+  "name": "2025-11-13-diff-algorithm",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "slidev build",
+    "dev": "slidev  --open --remote",
+    "export": "slidev export --with-clicks --per-slide --wait-until none"
+  },
+  "devDependencies": {
+    "@iconify-json/carbon": "catalog:icons",
+    "@iconify-json/devicon": "catalog:icons",
+    "@iconify-json/logos": "catalog:icons",
+    "@iconify-json/simple-icons": "catalog:icons",
+    "@iconify-json/solar": "catalog:icons",
+    "@iconify/utils": "catalog:icons",
+    "@proj-airi/lobe-icons": "catalog:icons"
+  }
+}
