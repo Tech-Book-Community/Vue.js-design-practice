@@ -1,0 +1,22 @@
+{
+  "name": "slidev",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "slidev build",
+    "dev": "slidev --open",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@slidev/cli": "^51.1.0",
+    "@slidev/theme-apple-basic": "^0.25.1",
+    "@slidev/theme-bricks": "^0.25.0",
+    "@slidev/theme-default": "latest",
+    "@slidev/theme-seriph": "latest",
+    "@slidev/theme-shibainu": "^0.25.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "unocss": "^66.1.3"
+  }
+}
