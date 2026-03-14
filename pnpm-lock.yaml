@@ -107,7 +107,9 @@ importers:
 
   2025-09-04/src: {}
 
-  2025-11-13-diff-algorithms/src:
+  2025-09-18-reactive-system/src: {}
+
+  2025-11-27-diff-algorithms/src:
     devDependencies:
       '@iconify-json/carbon':
         specifier: catalog:icons
