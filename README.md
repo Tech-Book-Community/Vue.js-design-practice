@@ -6,3 +6,5 @@
 - [第 2 篇 響應式系統](./2025-09-18-reactive-system/) - Rafael
 - 第 3 篇 渲染器
   - [第 9、10 章 簡單 Diff 演算法 / 雙端 Diff 演算法](./2025-11-27-diff-algorithms/) - Benny
+- 第 4 篇 編譯器優化
+  - [第 17 章 編譯器優化](./2026-03-19-compiler-optimization/) - Rafael

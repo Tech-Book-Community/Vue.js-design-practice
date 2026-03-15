@@ -1,0 +1,10 @@
+{
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "slidev",
+    "build": "slidev build --base /2026/compiler-optimization/ --out ../../dist/2026/compiler-optimization",
+    "export": "slidev export --per-slide --output ../2026-03-19-compiler-optimization.pdf"
+  }
+}
