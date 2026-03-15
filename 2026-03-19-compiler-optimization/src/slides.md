@@ -613,15 +613,13 @@ const patchChildren: PatchChildrenFn = (
 在 Vue 3 的核心 Diff 演算法（也就是 patchKeyedChildren 函式）中，最長遞增子序列（LIS）是插在「去除了頭尾相同節點後，專門用來處理中間 ```(未知混亂序列（Unknown Sequence)```的移動與掛載階段
 
 
-    舊陣列：[A, B, C, D, E, F, G]
+    舊陣列：[A, B, C, D, E, J, F, G]
     新陣列：[A, B, E, D, C, H, F, G] (字母代表節點的 Key)
 
 
-- 取出剩下的中間序列 進行LIS比對：
 
-     - 舊未處理：[C, D, E] (index: 2, 3, 4)
-     - 新未處理：[E, D, C, H] (index: 2, 3, 4, 5)
-
+> - Vue 2 是靠著不斷**「頭尾交叉比對」**來試圖找出移動規律，沒有使用 LIS。
+>- Vue 3 則是把頭尾比對退化成單純的**「頭尾過濾 (Sync)」，目的是為了縮小陣列範圍，然後把剩下的殘局直接交給「LIS 演算法」**去算出最少移動次數的最佳解
 
 ---
 
@@ -637,6 +635,7 @@ const patchChildren: PatchChildrenFn = (
     <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-gray-600 text-white">C</div>
     <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-gray-600 text-white">D</div>
     <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-gray-600 text-white">E</div>
+    <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-red-700 text-white">J</div>
     <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-green-700 text-white">F</div>
     <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-green-700 text-white">G</div>
   </div>
@@ -660,6 +659,7 @@ const patchChildren: PatchChildrenFn = (
   <span class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-green-700 inline-block"></span> 頭尾雙端已匹配，無需處理</span>
   <span class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-gray-600 inline-block"></span> 中間未知序列（需要 LIS 處理）</span>
   <span class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-blue-600 inline-block"></span> 新節點（需要 mount）</span>
+  <span class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-red-700 inline-block"></span> 舊節點不存在於新陣列（需要 unmount）</span>
 </div>
 
 </div>
@@ -687,6 +687,10 @@ const patchChildren: PatchChildrenFn = (
     <div class="flex flex-col items-center gap-1">
       <div class="text-xs text-gray-400">old[4]</div>
       <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-orange-600 text-white">E</div>
+    </div>
+    <div class="flex flex-col items-center gap-1">
+      <div class="text-xs text-red-400">old[5] ✕</div>
+      <div class="w-10 h-10 flex items-center justify-center rounded font-bold bg-red-700 text-white line-through">J</div>
     </div>
   </div>
 </div>
@@ -728,6 +732,9 @@ const patchChildren: PatchChildrenFn = (
   </div>
   <div class="text-gray-400 mt-1 text-xs">
     // E(old[4]+1=5), D(old[3]+1=4), C(old[2]+1=3), H(新節點=0)
+  </div>
+  <div class="text-red-400 mt-1 text-xs">
+    // J(old[5]) 不存在於新陣列 keyToNewIndexMap 中 → 直接 unmount 移除
   </div>
 </div>
 
@@ -778,6 +785,8 @@ const patchChildren: PatchChildrenFn = (
 
 ### 圖解：Step 4 — 從後往前掃，執行移動與掛載
 
+> J 已在 Step 2 建立映射時因不存在於新陣列而被 **unmount 移除**
+
 倒序遍歷新中間序列 `[E, D, C, H]`，以下一個穩定節點作為錨點（anchor）：
 
 <div class="mt-3 flex flex-col gap-3 text-sm">
@@ -812,5 +821,202 @@ const patchChildren: PatchChildrenFn = (
 </div>
 
 </div>
+
+---
+
+## 17.3 靜態提升
+
+把大量靜態樣板提升到 render 函式外部，成為常數
+
+```html
+<div id="app">
+  <p class="static-box" id="node-a">abc</p>
+  <p class="static-text" id="node-b">{{ title }}</p>
+</div>
+```
+
+```js
+// 1. 靜態節點被提升到 render 函式外部，成為常數
+const _hoisted_1 =  createVNode("p", _hoisted_1, "abc", 1 /* TEXT */),;
+
+function render(_ctx, _cache) {
+  return createVNode("div", null, [
+    _hoisted_1,
+    createVNode("p", _hoisted_2, _ctx.title, 1 /* TEXT */)
+  ])
+}
+
+
+
+```
+
+
+---
+
+## 17.3 屬性的靜態提升 (class, id, style)
+
+- Vue 模板
+
+```html
+<div>
+  <!-- 節點 A: 屬性是靜態的，內容是動態的 -->
+  <p class="static-box" id="node-a">{{ dynamicTextA }}</p>
+  
+  <!-- 節點 B: 屬性也是靜態的，內容是動態的 -->
+  <p class="static-text" id="node-b">{{ dynamicTextB }}</p>
+</div>
+```
+
+- 編譯後生成的 JavaScript 代碼
+
+```js
+// 1. 靜態屬性被提升到 render 函式外部，成為常數
+const _hoisted_1 = { class: "static-box", id: "node-a" };
+const _hoisted_2 = { class: "static-text", id: "node-b" };
+
+export function render(_ctx, _cache) {
+  return createVNode("div", null, [
+    // 2. 在建立節點 A 時，直接把 _hoisted_1 變數塞給它
+    createVNode("p", _hoisted_1, _ctx.dynamicTextA, 1 /* TEXT */),
+    
+    // 3. 在建立節點 B 時，直接把 _hoisted_2 變數塞給它
+    createVNode("p", _hoisted_2, _ctx.dynamicTextB, 1 /* TEXT */)
+  ])
+}
+```
+
+---
+
+## 17.4 預字串化
+
+當 Vue 的編譯器分析模板時，如果發現有大量且連續的靜態元素（即內部完全沒有包含任何動態綁定或指令的 HTML 結構），它會認定逐一為這些節點建立 VNode 是一種浪費。
+
+```html
+  // 假設有100個p標籤
+  <div>
+    <p>1</p>
+    <p>2</p>
+    <p>3</p>
+    <p>4</p>
+    <p>5</p>
+    //....
+  </div>
+
+```
+比起產生100個p標籤的vnode，不如直接產生一個靜態標籤，並在內部儲存為純 HTML 字串。
+
+```js
+// 1. 靜態屬性被提升到 render 函式外部，成為常數
+const hoisted_static =  createStaticVNode(`<div><p>1</p><p>2</p><p>3</p><p>4</p><p>5</p></div>`) ;
+
+function render(_ctx, _cache) {
+  return createVNode("div", null, [
+    hoisted_static,
+  ])
+}
+
+```
+
+---
+
+## 17.5 內嵌事件的暫存處理
+
+Vue 3 的編譯器（Compiler）為此引入了 cacheHandlers 的靜態提升策略：
+
+- 內嵌語句封裝：編譯器在處理 v-on 指令（transformOn）時，若發現綁定的是內嵌語句（Inline statement，如 count++），會自動將其封裝成一個函式表達式，例如 ```$event => { count++ }```。
+- 陣列快取機制：如果啟用了 cacheHandlers，編譯器會利用元件實體上的一個 _cache 陣列來儲存這個函式。產生的程式碼會類似 ```_cache || (_cache = $event => { count++ })```。
+
+
+```js
+// 原始模板
+<button @click="count++">點我</button>
+
+// 編譯後的程式碼
+const _cache = _ctx._cache || (_ctx._cache = []);
+const _hoisted_1 = {
+  onClick: _cache[0] || (_cache[0] = $event => (_ctx.count++))
+};
+
+function render(_ctx, _cache) {
+  return createVNode("button", _hoisted_1, "點我");
+}
+
+```
+
+---
+
+## 17.6 v-once
+
+- ```v-once``` 指令用於告訴 Vue 編譯器，某個元素及其子孫元素在初次渲染後將不再需要更新。
+- 這意味著編譯器會將這些內容視為靜態內容，並在初次渲染後跳過對它們的 diff 比較。
+
+```html
+<div v-once>
+  <h1>這是一個靜態標題</h1>
+  <p>這裡的內容只會渲染一次</p>
+</div>
+```
+
+```js
+function render(_ctx, _cache) {
+  return (_openBlock(), _createElementBlock("div", null, [
+    // 重點就在這裡：_cache 陣列
+    _cache[0] || (
+      _setBlockTracking(-1), // 暫時關閉 Block 追蹤，優化效能
+      _cache[0] = [
+        _createElementVNode("h1", null, "這是一個靜態標題", -1 /* HOISTED */),
+        _createElementVNode("p", null, "這裡的內容只會渲染一次", -1 /* HOISTED */)
+      ],
+      _setBlockTracking(1),  // 恢復 Block 追蹤
+      _cache[0]
+    )
+  ]))
+}
+```
+
+---
+
+## 總結
+Vue 3 編譯器優化的核心哲學：**將執行期（Runtime）的工作盡可能前移到編譯期（Compile Time）**，讓框架在構建階段就掌握模板的靜態結構，從而大幅減少瀏覽器中的計算量。
+
+<div class="text-sm space-y-3 mt-4">
+
+| 優化策略 | 解決的問題 | 核心手段 |
+|---|---|---|
+| **Patch Flag** | Diff 時不必比對所有屬性 | 2 的冪次位元旗標，精確標記動態部位 |
+| **dynamicChildren** | 不必遍歷整棵 VNode 樹 | 只收集帶 Patch Flag 的節點，攤平成一維陣列 |
+| **Block 樹 (v-if / v-for)** | 結構動態變化時 dynamicChildren 錯位 | v-if 分支、v-for 以 Fragment 獨立成 Block |
+| **LIS 最長遞增子序列** | Fragment 陣列 Diff 移動次數最少化 | patchKeyedChildren 中以 LIS 決定哪些節點不需移動 |
+| **靜態提升** | 每次重新渲染都重建靜態 VNode | 靜態節點與屬性提升為 render 外的常數 |
+| **預字串化** | 大量連續靜態節點逐一建立 VNode 浪費 | `createStaticVNode` 直接儲存為純 HTML 字串 |
+| **內嵌事件暫存** | `@click="count++"` 每次渲染都產生新函式 | `_cache` 陣列快取，避免不必要的 prop diff |
+| **v-once** | 一次性內容仍參與每輪 diff | `_cache` 儲存首次渲染結果，後續直接跳過 |
+
+</div>
+
+> **一句話總結**：傳統 Virtual DOM 的代價是「每次更新都做全樹比對」；Vue 3 透過編譯器在構建期標記靜態與動態的邊界，讓執行期的渲染器只需做「精確的定點更新」——這正是 Vue 3 效能飛躍的根本原因。
+
+---
+
+## 複習問題
+
+1. **Patch Flag 為什麼使用 2 的冪次方（1, 2, 4, 8...）而非連續整數？**
+   靜態節點為何標記為 `-1`，而非 `0`？
+
+2. **`dynamicChildren` 是如何被收集的？**
+   解釋 `openBlock` / `closeBlock` / `createBlock` 三者的分工，以及為什麼需要全域 `currentBlock` 收集袋。
+
+3. **當模板中有 `v-if` 時，為什麼 `v-if` 的每個分支也需要成為獨立的 Block？**
+   若不這樣處理，`dynamicChildren` 會發生什麼問題？
+
+4. **`v-for` 為何需要以 `Fragment` 包裝成獨立 Block，而不是直接將子節點收進父層的 `dynamicChildren`？**
+   `KEYED_FRAGMENT` 與 `UNKEYED_FRAGMENT` 有何差異？
+
+5. **Vue 3 的 `patchKeyedChildren` 中，LIS（最長遞增子序列）解決了什麼問題？**
+   相較於 Vue 2 的雙端比對，Vue 3 的策略有何不同？請用 `[A, B, C, D, E, J, F, G]` → `[A, B, E, D, C, H, F, G]` 的例子說明。
+
+6. **靜態提升、預字串化、內嵌事件暫存（cacheHandlers）、`v-once` 這四種優化策略分別針對哪種「重複浪費」？**
+   它們各自用什麼手段消除這種浪費？
+
 
 ---
